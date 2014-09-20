@@ -57,6 +57,18 @@ typedef struct token {
 
 regex_t renum;
 
+void error(char *str, ...) {
+	va_list ap;
+
+	fprintf(stderr,"error: ");
+
+	va_start(ap,str);
+	vfprintf(stderr,str,ap);
+	va_end(ap);
+
+	fputc('\n',stderr);
+}
+
 void die(char *str, ...) {
 	va_list ap;
 

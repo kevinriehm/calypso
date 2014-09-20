@@ -1,4 +1,4 @@
-LYP_CSRC := calypso.c rbtree.c
+LYP_CSRC := calypso.c language.tab.c language.yy.c rbtree.c
 LYP_CFLAGS := -g
 
 LYP_DEPS := $(LYP_CSRC:.c=.d)
@@ -9,6 +9,12 @@ calypso: $(LYP_OBJS)
 
 %.o: %.c
 	$(CC) $(LYP_CFLAGS) -c -MMD -o $@ $<
+
+%.yy.c: %.l
+	$(LEX) -t $< > $@
+
+%.tab.c: %.y
+	$(YACC) -b $* -d $<
 
 -include $(LYP_DEPS)
 

@@ -1,27 +1,30 @@
-LYP_CSRC := calypso.c language.tab.c language.yy.c rbtree.c
+LYP_CSRC := calypso.c rbtree.c
+LYP_LSRC := language.l
+LYP_YSRC := language.y
+
 LYP_CFLAGS := -g
 
-LYP_DEPS := $(LYP_CSRC:.c=.d)
-LYP_OBJS := $(LYP_CSRC:.c=.o)
+LYP_DEPS := $(LYP_CSRC:.c=.d) $(LYP_LSRC:.l=.yy.d) $(LYP_YSRC:.y=.tab.d)
+LYP_OBJS := $(LYP_CSRC:.c=.o) $(LYP_LSRC:.l=.yy.o) $(LYP_YSRC:.y=.tab.o)
 
-calypso: $(LYP_OBJS)
+bin/calypso: $(addprefix obj/,$(LYP_OBJS))
 	$(CC) $(LYP_CFLAGS) -o $@ $^
 
-%.o: %.c
-	$(CC) $(LYP_CFLAGS) -c -MMD -o $@ $<
-
-%.yy.c: %.l
+%.yy.c: %.l %.tab.h
 	$(LEX) -t $< > $@
 
-%.tab.c: %.y
+%.tab.c %.tab.h: %.y
 	$(YACC) -b $* -d $<
 
--include $(LYP_DEPS)
+obj/%.o: src/%.c
+	$(CC) -c -MMD -MF dep/$*.d -MT obj/$*.o $(LYP_CFLAGS) -o $@ $<
+
+-include $(addprefix dep/, $(LYP_DEPS))
 
 .PHONY: clean
 
 clean:
-	$(RM) calypso
-	$(RM) $(LYP_DEPS)
-	$(RM) $(LYP_OBJS)
+	$(RM) bin/*
+	$(RM) dep/*
+	$(RM) obj/*
 

@@ -9,28 +9,30 @@ LYP_OBJS := $(LYP_CSRC:.c=.o) $(LYP_LSRC:.l=.yy.o) $(LYP_YSRC:.y=.tab.o)
 
 CBUILD = $(CC) -c -MMD -MF dep/$*.d -MT obj/$*.o $(LYP_CFLAGS) -o $@ $<
 
-bin/calypso: $(addprefix obj/,$(LYP_OBJS))
+.PRECIOUS: %/
+
+bin/calypso: $(addprefix obj/,$(LYP_OBJS)) | bin/
 	$(CC) $(LYP_CFLAGS) -o $@ $^
 
-gen/%.yy.c: src/%.l gen/%.tab.h
+gen/%.yy.c: src/%.l gen/%.tab.h | gen/
 	$(LEX) -t $< > $@
 
-gen/%.tab.c gen/%.tab.h: src/%.y
+gen/%.tab.c gen/%.tab.h: src/%.y | gen/
 	$(YACC) -b gen/$* -d $<
 
-obj/%.o: gen/%.c
+obj/%.o: gen/%.c | dep/ obj/
 	$(CBUILD)
 
-obj/%.o: src/%.c
+obj/%.o: src/%.c | dep/ obj/
 	$(CBUILD)
+
+%/:
+	mkdir $*
 
 -include $(addprefix dep/, $(LYP_DEPS))
 
 .PHONY: clean
 
 clean:
-	$(RM) bin/*
-	$(RM) dep/*
-	$(RM) gen/*
-	$(RM) obj/*
+	$(RM) -r bin dep gen obj
 

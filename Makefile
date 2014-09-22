@@ -1,8 +1,9 @@
-LYP_CSRC := calypso.c rbtree.c
+LYP_CSRC := calypso.c htable.c rbtree.c
 LYP_LSRC := language.l
 LYP_YSRC := language.y
 
-LYP_CFLAGS := -g -Igen -Isrc
+LYP_CFLAGS := -g --std=c11 -Igen -Isrc -D_POSIX_C_SOURCE=200809L
+LYP_LIBS   := -lm
 
 LYP_DEPS := $(LYP_CSRC:.c=.d) $(LYP_LSRC:.l=.yy.d) $(LYP_YSRC:.y=.tab.d)
 LYP_OBJS := $(LYP_CSRC:.c=.o) $(LYP_LSRC:.l=.yy.o) $(LYP_YSRC:.y=.tab.o)
@@ -12,7 +13,7 @@ CBUILD = $(CC) -c -MMD -MF dep/$*.d -MT obj/$*.o $(LYP_CFLAGS) -o $@ $<
 .PRECIOUS: %/
 
 bin/calypso: $(addprefix obj/,$(LYP_OBJS)) | bin/
-	$(CC) $(LYP_CFLAGS) -o $@ $^
+	$(CC) $(LYP_CFLAGS) -o $@ $^ $(LYP_LIBS)
 
 gen/%.yy.c: src/%.l gen/%.tab.h | gen/
 	$(LEX) -t $< > $@

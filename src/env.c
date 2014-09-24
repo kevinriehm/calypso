@@ -44,7 +44,7 @@ bool env_get(env_t *env, char *name, cell_t **val) {
 	assert(env && name);
 
 	do exists = htable_lookup(env->tab,name,&hval);
-	while(!exists && env = env->parent);
+	while(!exists && (env = env->parent));
 
 	if(exists && val)
 		*val = hval.p;
@@ -62,12 +62,12 @@ void env_set(env_t *env, char *name, cell_t *val, bool local) {
 		localenv = env;
 
 		do exists = htable_lookup(env->tab,name,NULL);
-		while(!exists && env = env->parent);
+		while(!exists && (env = env->parent));
 
 		if(!exists)
 			env = localenv;
 	}
 
-	htable_insert(env,name,(hvalue_t) { .p = val });
+	htable_insert(env->tab,name,(hvalue_t) { .p = val });
 }
 

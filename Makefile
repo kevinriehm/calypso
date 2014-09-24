@@ -1,4 +1,4 @@
-LYP_CSRC := calypso.c htable.c rbtree.c
+LYP_CSRC := calypso.c env.c htable.c rbtree.c
 LYP_LSRC := language.l
 LYP_YSRC := language.y
 

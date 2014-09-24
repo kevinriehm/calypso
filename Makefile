@@ -28,7 +28,7 @@ obj/%.o: src/%.c | dep/ obj/
 	$(CBUILD)
 
 %/:
-	mkdir $*
+	mkdir -p $*
 
 -include $(addprefix dep/, $(LYP_DEPS))
 

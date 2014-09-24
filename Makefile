@@ -1,8 +1,8 @@
-LYP_CSRC := calypso.c env.c htable.c rbtree.c
+LYP_CSRC := calypso.c cell.c env.c htable.c rbtree.c
 LYP_LSRC := language.l
 LYP_YSRC := language.y
 
-LYP_CFLAGS := -g --std=c11 -Igen -Isrc -D_POSIX_C_SOURCE=200809L
+LYP_CFLAGS := -g --std=c11 -Igen -Isrc -D_POSIX_C_SOURCE=200809L $(CFLAGS)
 LYP_LIBS   := -lm
 
 LYP_DEPS := $(LYP_CSRC:.c=.d) $(LYP_LSRC:.l=.yy.d) $(LYP_YSRC:.y=.tab.d)

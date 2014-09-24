@@ -1,4 +1,6 @@
 %{
+#include "cell.h"
+
 #include "language.tab.h"
 %}
 
@@ -6,7 +8,7 @@ INT 0|[1-9][0-9]*
 
 %%
 
-[ \n]+ return SPACE; // Whitespace
+[ \n]+ ; // Whitespace
 
 [+-]?{INT}             |
 [+-]?0[Xx][0-9a-fA-F]+ |
@@ -33,12 +35,12 @@ nan                             {
 	return STRING;
 }
 
-'|\(|\) return yytext[0];
-
-[^ 0-9'()][^ ()]* {
+[a-zA-Z$_][a-zA-Z0-9$_-]* {
 	yylval.str = strdup(yytext);
 	return SYMBOL;
 }
+
+. return yytext[0];
 
 %%
 

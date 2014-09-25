@@ -18,7 +18,8 @@ struct env {
 env_t *env_cons(env_t *parent) {
 	env_t *env;
 
-	assert(env = malloc(sizeof *env));
+	env = malloc(sizeof *env);
+	assert(env);
 	env->ref = 1;
 	env->parent = parent;
 	env->tab = htable_cons(0);

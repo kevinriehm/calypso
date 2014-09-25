@@ -38,6 +38,12 @@ void env_free(env_t *env) {
 	htable_free(env->tab);
 }
 
+env_t *env_ref(env_t *env) {
+	if(env) env->ref++;
+
+	return env;
+}
+
 bool env_get(env_t *env, char *name, cell_t **val) {
 	bool exists;
 	hvalue_t hval;

@@ -26,14 +26,15 @@ cell_t *cell_cons_t(enum cell_type type, ...) {
 
 	switch(type) {
 	case VAL_NIL: cell->cdr.p = NULL; break;
-	case VAL_SYM: cell->cdr.str = va_arg(ap,char *);  break;
-	case VAL_I64: cell->cdr.i64 = va_arg(ap,int64_t); break;
-	case VAL_DBL: cell->cdr.dbl = va_arg(ap,double);  break;
-	case VAL_CHR: cell->cdr.chr = va_arg(ap,int);     break;
-	case VAL_STR: cell->cdr.str = va_arg(ap,char *);  break;
+	case VAL_SYM: cell->cdr.str = va_arg(ap,char *);     break;
+	case VAL_I64: cell->cdr.i64 = va_arg(ap,int64_t);    break;
+	case VAL_DBL: cell->cdr.dbl = va_arg(ap,double);     break;
+	case VAL_CHR: cell->cdr.chr = va_arg(ap,int);        break;
+	case VAL_STR: cell->cdr.str = va_arg(ap,char *);     break;
+	case VAL_LBA: cell->cdr.lba = va_arg(ap,lambda_t *); break;
 
 	case VAL_FCN:
-		cell->cdr.func = va_arg(ap,
+		cell->cdr.fcn = va_arg(ap,
 			cell_t *(*)(env_t *, cell_t *));
 		break;
 

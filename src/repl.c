@@ -3,6 +3,7 @@
 
 #include "cell.h"
 #include "env.h"
+#include "repl.h"
 #include "util.h"
 
 extern FILE *yyin;
@@ -23,8 +24,32 @@ bool readf(FILE *f, cell_t **cell) {
 	return !err;
 }
 
+static cell_t *eval_lambda(env_t *env, lambda_t *lamb, cell_t *args) {
+	env_t *lambenv;
+	cell_t *lambarg, *lambexpr, *val;
+
+	lambenv = env_cons(lamb->env);
+
+	// Bind the arguments
+	for(lambarg = lamb->args; args && lambarg;
+		args = args->cdr.p, lambarg = lambarg->cdr.p)
+		env_set(lambenv,lambarg->car.p->cdr.str,eval(env,args->car.p),
+			true);
+	assert(!lambarg);
+
+	// Evaluate the expressions
+	for(lambexpr = lamb->body; lambexpr; lambexpr = lambexpr->cdr.p)
+		val = eval(lambenv,lambexpr->car.p);
+
+	env_free(lambenv);
+
+	return val;
+}
+
 cell_t *eval(env_t *env, cell_t *sexp) {
-	cell_t *op;
+	env_t *lambenv;
+	lambda_t *lamb;
+	cell_t *arg, *body, *op;
 
 	if(!sexp)
 		return sexp;
@@ -45,8 +70,12 @@ cell_t *eval(env_t *env, cell_t *sexp) {
 		assert(sexp->car.type > NUM_VAL_TYPES);
 
 		op = eval(env,sexp->car.p);
-		assert(op && op->car.type == VAL_FCN);
-		return op->cdr.func(env,sexp->cdr.p);
+		assert(op && (op->car.type == VAL_FCN
+			|| op->car.type == VAL_LBA));
+		if(op->car.type == VAL_FCN)
+			return op->cdr.fcn(env,sexp->cdr.p);
+		else if(op->car.type == VAL_LBA)
+			return eval_lambda(env,op->cdr.lba,sexp->cdr.p);
 	}
 
 	error("unhandled s-expression of type %i",sexp->car.type);
@@ -68,6 +97,7 @@ void print(cell_t *sexp) {
 	case VAL_CHR: printf("'%c'",sexp->cdr.chr);   break;
 	case VAL_STR: printf("\"%s\"",sexp->cdr.str); break;
 	case VAL_FCN: printf("<%p>",sexp->cdr.dbl);   break;
+	case VAL_LBA: printf("<lambda>");             break;
 
 	default:
 		assert(sexp->car.type > NUM_VAL_TYPES);

@@ -1,5 +1,7 @@
 #include <assert.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "cell.h"
 #include "env.h"
@@ -57,7 +59,7 @@ static cell_t *cons(env_t *env, cell_t *args) {
 	args = args->cdr.p;
 	assert(args);
 	b = eval(env,args->car.p);
-	assert(!b || b->car.p > NUM_VAL_TYPES);
+	assert(!b || b->car.type > NUM_VAL_TYPES);
 
 	assert(!args->cdr.p);
 
@@ -88,14 +90,35 @@ static cell_t *eq(env_t *env, cell_t *args) {
 	case VAL_I64: return a->cdr.i64 == b->cdr.i64 ? tsym : NULL;
 	case VAL_DBL: return a->cdr.dbl == b->cdr.dbl ? tsym : NULL;
 	case VAL_CHR: return a->cdr.chr == b->cdr.chr ? tsym : NULL;
-	case VAL_FCN: return a->cdr.func == b->cdr.func ? tsym : NULL;
 	case VAL_STR: return strcmp(a->cdr.str,b->cdr.str) == 0 ? tsym : NULL;
+	case VAL_FCN: return a->cdr.fcn == b->cdr.fcn ? tsym : NULL;
+	case VAL_LBA: return a->cdr.lba == b->cdr.lba ? tsym : NULL;
 
 	default:
 		assert(a->car.type < NUM_VAL_TYPES);
 		error("unhandled value in eq, type %i",a->car.type);
 		return NULL;
 	}
+}
+
+static cell_t *lambda(env_t *env, cell_t *args) {
+	cell_t *arg;
+	lambda_t *lamb;
+
+	assert(args);
+
+	// Check the argument list
+	for(arg = args->car.p; arg; arg = arg->cdr.p)
+		assert(arg->car.p->car.type == VAL_SYM);
+
+	// Set up the lambda
+	lamb = malloc(sizeof *lamb);
+	assert(lamb);
+	lamb->env = env_ref(env);
+	lamb->args = args->car.p;
+	lamb->body = args->cdr.p;
+
+	return cell_cons_t(VAL_LBA,lamb);
 }
 
 static cell_t *quote(env_t *env, cell_t *args) {
@@ -208,16 +231,17 @@ void builtin_init(env_t *env) {
 		char *name;
 		cell_t *(*func)(env_t *, cell_t *);
 	} funcs[] = {
-		{"atom", atom},
-		{"car", car},
-		{"cdr", cdr},
-		{"cond", cond},
-		{"cons", cons},
-		{"eq", eq},
-		{"quote", quote},
-		{"=", assign},
-		{"+", add},
-		{"-", sub},
+		{"atom",   atom},
+		{"car",    car},
+		{"cdr",    cdr},
+		{"cond",   cond},
+		{"cons",   cons},
+		{"eq",     eq},
+		{"lambda", lambda},
+		{"quote",  quote},
+		{"=",      assign},
+		{"+",      add},
+		{"-",      sub},
 		{NULL, NULL}
 	};
 

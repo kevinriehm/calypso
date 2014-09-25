@@ -8,6 +8,8 @@ typedef struct env env_t;
 env_t *env_cons(env_t *);
 void env_free(env_t *);
 
+env_t *env_ref(env_t *);
+
 bool env_get(env_t *, char *, struct cell **);
 void env_set(env_t *, char *, struct cell *, bool);
 

@@ -5,6 +5,12 @@
 
 struct env;
 
+typedef struct lambda {
+	struct env *env;
+	struct cell *args;
+	struct cell *body;
+} lambda_t;
+
 typedef union cell_car {
 	struct cell *p;
 
@@ -16,6 +22,7 @@ typedef union cell_car {
 		VAL_CHR,
 		VAL_STR,
 		VAL_FCN,
+		VAL_LBA,
 
 		NUM_VAL_TYPES
 	} type;
@@ -30,7 +37,9 @@ typedef union cell_cdr {
 	char chr;
 	char *str;
 
-	struct cell *(*func)(struct env *, struct cell *);
+	struct cell *(*fcn)(struct env *, struct cell *);
+
+	struct lambda *lba;
 } cell_cdr_t;
 
 typedef struct cell {

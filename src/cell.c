@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "cell.h"
+#include "env.h"
 #include "util.h"
 
 cell_t *cell_cons(cell_t *car, cell_t *cdr) {
@@ -30,7 +31,12 @@ cell_t *cell_cons_t(enum cell_type type, ...) {
 	case VAL_DBL: cell->cdr.dbl = va_arg(ap,double);  break;
 	case VAL_CHR: cell->cdr.chr = va_arg(ap,int);     break;
 	case VAL_STR: cell->cdr.str = va_arg(ap,char *);  break;
-	case VAL_FCN: cell->cdr.func = va_arg(ap,cell_t *(*)(cell_t *)); break;
+
+	case VAL_FCN:
+		cell->cdr.func = va_arg(ap,
+			cell_t *(*)(env_t *, cell_t *));
+		break;
+
 	default: die("unhandled cell type (%i)",type);
 	}
 

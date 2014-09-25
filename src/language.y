@@ -31,7 +31,8 @@ int yylex(void);
 
 %%
 
-root: s_exp { parseroot = $1; YYACCEPT; }
+root: { YYABORT; }
+    | s_exp { parseroot = $1; YYACCEPT; }
     ;
 
 s_exp: atom

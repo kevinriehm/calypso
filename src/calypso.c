@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "cell.h"
+#include "env.h"
 
 typedef struct string {
 	char *s;
@@ -72,8 +73,35 @@ bool readf(FILE *f, cell_t **cell) {
 	return !err;
 }
 
-cell_t *eval(cell_t *sexp) {
-	return sexp;
+cell_t *eval(env_t *env, cell_t *sexp) {
+	cell_t *op;
+
+	if(!sexp)
+		return sexp;
+
+	switch(sexp->car.type) {
+	case VAL_NIL:
+	case VAL_I64:
+	case VAL_DBL:
+	case VAL_CHR:
+	case VAL_STR:
+	case VAL_FCN:
+		return sexp;
+
+	case VAL_SYM:
+		return env_get(env,sexp->cdr.str,&sexp) ? sexp : NULL;
+
+	default:
+		assert(sexp->car.type > NUM_VAL_TYPES);
+
+		op = eval(env,sexp->car.p);
+		assert(op && op->car.type == VAL_FCN);
+		return op->cdr.func(env,sexp->cdr.p);
+	}
+
+	error("unhandled s-expression of type %i",sexp->car.type);
+
+	return NULL;
 }
 
 void print(cell_t *sexp) {
@@ -104,30 +132,70 @@ void print(cell_t *sexp) {
 	}
 }
 
-void run_file(FILE *in) {
+void run_file(env_t *env, FILE *in) {
 	cell_t *sexp;
 
 	while(readf(in,&sexp)) {
-		print(eval(sexp));
+		print(eval(env,sexp));
 		putchar('\n');
+	}
+}
+
+cell_t *add(env_t *env, cell_t *args) {
+	double dbl, xdbl;
+	int64_t i64, xi64;
+	cell_t *r, *x;
+	enum cell_type type;
+
+	dbl = i64 = 0;
+	type = VAL_NIL;
+	for(; args; args = args->cdr.p) {
+		x = eval(env,args->car.p);
+
+		assert(x
+			&& (x->car.type == VAL_I64 || x->car.type == VAL_DBL));
+
+		switch(x->car.type) {
+		case VAL_I64: xdbl = xi64 = x->cdr.i64; break;
+		case VAL_DBL: xdbl = xi64 = x->cdr.dbl; break;
+		}
+
+add_x:
+		switch(type) {
+		case VAL_NIL: type = x->car.type; goto add_x;
+
+		case VAL_I64: i64 += xi64; break;
+		case VAL_DBL: dbl += xdbl; break;
+		}
+	}
+
+	switch(type) {
+	case VAL_NIL: return cell_cons_t(VAL_DBL,0.);
+	case VAL_I64: return cell_cons_t(VAL_I64,i64);
+	case VAL_DBL: return cell_cons_t(VAL_DBL,dbl);
 	}
 }
 
 int main(int argc, char **argv) {
 	int i;
 	FILE *in;
+	env_t *globals;
+
+	globals = env_cons(NULL);
+
+	env_set(globals,"+",cell_cons_t(VAL_FCN,add),true);
 
 	if(argc > 1) {
 		for(i = 1; i < argc; i++) {
 			if(strcmp(argv[i],"-") == 0)
-				run_file(stdin);
+				run_file(globals,stdin);
 			else {
 				if(in = fopen(argv[i],"r"))
-					run_file(in);
+					run_file(globals,in);
 				else die("cannot open '%s'",argv[i]);
 			}
 		}
-	} else run_file(stdin);
+	} else run_file(globals,stdin);
 
 	return 0;
 }

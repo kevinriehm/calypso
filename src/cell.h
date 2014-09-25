@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+struct env;
+
 typedef union cell_car {
 	struct cell *p;
 
@@ -28,7 +30,7 @@ typedef union cell_cdr {
 	char chr;
 	char *str;
 
-	struct cell *(*func)(struct cell *);
+	struct cell *(*func)(struct env *, struct cell *);
 } cell_cdr_t;
 
 typedef struct cell {

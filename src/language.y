@@ -37,10 +37,10 @@ root: { YYABORT; }
 
 s_exp: atom
      | '(' s_exp_list ')' { $$ = $2; }
-     | '\'' '(' s_exp_list ')' {
+     | '\'' s_exp {
 		$$ = cell_cons(
 			cell_cons_t(VAL_SYM,"quote"),
-			cell_cons($3,NULL)
+			cell_cons($2,NULL)
 		);
 	}
      ;

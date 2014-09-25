@@ -30,13 +30,13 @@ nan                             {
 	return CHARACTER;
 }
 
-\"(.|\\\")*\" {
+\"([^"]|\\\")*\" {
 	yylval.str = strndup(yytext + 1,yyleng - 2);
 	return STRING;
 }
 
 [a-zA-Z$_][a-zA-Z0-9$_-]* |
-"+"|"-"|"*"|"/"|"="       {
+=|\+|-                    {
 	yylval.str = strdup(yytext);
 	return SYMBOL;
 }

@@ -23,7 +23,7 @@ env_t *env_cons(env_t *parent) {
 	env->parent = parent;
 	env->tab = htable_cons(0);
 
-	assert(parent->ref++);
+	assert(!parent || parent->ref++);
 
 	return env;
 }

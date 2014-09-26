@@ -166,8 +166,7 @@ static cell_t *add(env_t *env, cell_t *args) {
 	for(; args; args = args->cdr.p) {
 		x = eval(env,args->car.p);
 
-		check(x
-			&& (x->car.type == VAL_I64 || x->car.type == VAL_DBL),
+		check(x && (x->car.type == VAL_I64 || x->car.type == VAL_DBL),
 			"argument to + not a number");
 
 		switch(x->car.type) {
@@ -202,8 +201,7 @@ static cell_t *sub(env_t *env, cell_t *args) {
 	for(; args; args = args->cdr.p) {
 		x = eval(env,args->car.p);
 
-		check(x
-			&& (x->car.type == VAL_I64 || x->car.type == VAL_DBL),
+		check(x && (x->car.type == VAL_I64 || x->car.type == VAL_DBL),
 			"argument to - not a number");
 
 		switch(x->car.type) {

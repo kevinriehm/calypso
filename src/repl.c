@@ -150,5 +150,8 @@ void run_file(env_t *env, FILE *in) {
 			putchar('\n');
 		}
 	}
+
+	if(interactive)
+		putchar('\n');
 }
 

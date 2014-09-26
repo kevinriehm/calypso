@@ -2,6 +2,8 @@
 #include <setjmp.h>
 #include <stdio.h>
 
+#include <unistd.h>
+
 #include "cell.h"
 #include "check.h"
 #include "env.h"
@@ -121,16 +123,30 @@ void print(cell_t *sexp) {
 
 void run_file(env_t *env, FILE *in) {
 	cell_t *sexp;
+	bool interactive;
 
 	// Reset the line counter
 	lineno = 1;
 
+	// Is this an interactive terminal?
+	interactive = isatty(fileno(in));
+
 	// Catch check failures (i.e., run-time errors)
 	setjmp(checkjmp);
 
-	while(readf(in,&sexp)) {
-		print(eval(env,sexp));
-		putchar('\n');
+	while(true) {
+		if(interactive)
+			printf("> ");
+
+		if(!readf(in,&sexp))
+			break;
+
+		sexp = eval(env,sexp);
+
+		if(interactive) {
+			print(sexp);
+			putchar('\n');
+		}
 	}
 }
 

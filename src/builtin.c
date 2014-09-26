@@ -1,9 +1,9 @@
-#include <assert.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "cell.h"
+#include "check.h"
 #include "env.h"
 #include "repl.h"
 #include "util.h"
@@ -11,7 +11,7 @@
 static cell_t *tsym;
 
 static cell_t *atom(env_t *env, cell_t *args) {
-	assert(args && !args->cdr.p);
+	check(args && !args->cdr.p);
 
 	args = eval(env,args->car.p);
 
@@ -19,19 +19,19 @@ static cell_t *atom(env_t *env, cell_t *args) {
 }
 
 static cell_t *car(env_t *env, cell_t *args) {
-	assert(args && !args->cdr.p);
+	check(args && !args->cdr.p);
 	args = eval(env,args->car.p);
 
-	assert(args && args->car.type > NUM_VAL_TYPES);
+	check(args && args->car.type > NUM_VAL_TYPES);
 
 	return args->car.p;
 }
 
 static cell_t *cdr(env_t *env, cell_t *args) {
-	assert(args && !args->cdr.p);
+	check(args && !args->cdr.p);
 	args = eval(env,args->car.p);
 
-	assert(args && args->car.type > NUM_VAL_TYPES);
+	check(args && args->car.type > NUM_VAL_TYPES);
 
 	return args->cdr.p;
 }
@@ -41,7 +41,7 @@ static cell_t *cond(env_t *env, cell_t *args) {
 
 	for(; args; args = args->cdr.p) {
 		pair = args->car.p;
-		assert(pair && pair->cdr.p && !pair->cdr.p->cdr.p);
+		check(pair && pair->cdr.p && !pair->cdr.p->cdr.p);
 
 		if(eval(env,pair->car.p))
 			return eval(env,pair->cdr.p->car.p);
@@ -53,15 +53,15 @@ static cell_t *cond(env_t *env, cell_t *args) {
 static cell_t *cons(env_t *env, cell_t *args) {
 	cell_t *a, *b;
 
-	assert(args);
+	check(args);
 	a = eval(env,args->car.p);
 
 	args = args->cdr.p;
-	assert(args);
+	check(args);
 	b = eval(env,args->car.p);
-	assert(!b || b->car.type > NUM_VAL_TYPES);
+	check(!b || b->car.type > NUM_VAL_TYPES);
 
-	assert(!args->cdr.p);
+	check(!args->cdr.p);
 
 	return cell_cons(a,b);
 }
@@ -69,14 +69,14 @@ static cell_t *cons(env_t *env, cell_t *args) {
 static cell_t *eq(env_t *env, cell_t *args) {
 	cell_t *a, *b;
 
-	assert(args);
+	check(args);
 	a = eval(env,args->car.p);
 
 	args = args->cdr.p;
-	assert(args);
+	check(args);
 	b = eval(env,args->car.p);
 
-	assert(!args->cdr.p);
+	check(!args->cdr.p);
 
 	if(!a || !b)
 		return a || b ? NULL : tsym;
@@ -95,7 +95,7 @@ static cell_t *eq(env_t *env, cell_t *args) {
 	case VAL_LBA: return a->cdr.lba == b->cdr.lba ? tsym : NULL;
 
 	default:
-		assert(a->car.type < NUM_VAL_TYPES);
+		check(a->car.type < NUM_VAL_TYPES);
 		error("unhandled value in eq, type %i",a->car.type);
 		return NULL;
 	}
@@ -105,15 +105,15 @@ static cell_t *lambda(env_t *env, cell_t *args) {
 	cell_t *arg;
 	lambda_t *lamb;
 
-	assert(args);
+	check(args);
 
 	// Check the argument list
 	for(arg = args->car.p; arg; arg = arg->cdr.p)
-		assert(arg->car.p->car.type == VAL_SYM);
+		check(arg->car.p->car.type == VAL_SYM);
 
 	// Set up the lambda
 	lamb = malloc(sizeof *lamb);
-	assert(lamb);
+	check(lamb);
 	lamb->env = env_ref(env);
 	lamb->args = args->car.p;
 	lamb->body = args->cdr.p;
@@ -122,7 +122,7 @@ static cell_t *lambda(env_t *env, cell_t *args) {
 }
 
 static cell_t *quote(env_t *env, cell_t *args) {
-	assert(args && !args->cdr.p);
+	check(args && !args->cdr.p);
 
 	return args->car.p;
 }
@@ -131,16 +131,16 @@ static cell_t *assign(env_t *env, cell_t *args) {
 	cell_t *sym, *val;
 
 	// The symbol to assign to
-	assert(args && args->car.type > NUM_VAL_TYPES);
+	check(args && args->car.type > NUM_VAL_TYPES);
 	sym = args->car.p;
-	assert(sym && sym->car.type == VAL_SYM);
+	check(sym && sym->car.type == VAL_SYM);
 
 	// The value to assign
 	args = args->cdr.p;
-	assert(args && args->car.type > NUM_VAL_TYPES);
+	check(args && args->car.type > NUM_VAL_TYPES);
 	val = eval(env,args->car.p);
 
-	assert(!args->cdr.p);
+	check(!args->cdr.p);
 
 	// Assign it!
 	env_set(env,sym->cdr.str,val,false);
@@ -159,7 +159,7 @@ static cell_t *add(env_t *env, cell_t *args) {
 	for(; args; args = args->cdr.p) {
 		x = eval(env,args->car.p);
 
-		assert(x
+		check(x
 			&& (x->car.type == VAL_I64 || x->car.type == VAL_DBL));
 
 		switch(x->car.type) {
@@ -194,7 +194,7 @@ static cell_t *sub(env_t *env, cell_t *args) {
 	for(; args; args = args->cdr.p) {
 		x = eval(env,args->car.p);
 
-		assert(x
+		check(x
 			&& (x->car.type == VAL_I64 || x->car.type == VAL_DBL));
 
 		switch(x->car.type) {

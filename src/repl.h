@@ -1,10 +1,13 @@
 #ifndef REPL_H
 #define REPL_H
 
+#include <setjmp.h>
 #include <stdio.h>
 
 struct cell;
 struct env;
+
+extern jmp_buf checkjmp;
 
 void run_file(struct env *, FILE *);
 

@@ -1,9 +1,8 @@
-#include <assert.h>
 #include <setjmp.h>
-#include <signal.h>
 #include <stdio.h>
 
 #include "cell.h"
+#include "check.h"
 #include "env.h"
 #include "repl.h"
 #include "util.h"
@@ -11,7 +10,7 @@
 extern FILE *yyin;
 extern cell_t *parseroot;
 
-static jmp_buf abortjmp;
+jmp_buf checkjmp;
 
 int yyparse(void);
 
@@ -39,7 +38,7 @@ static cell_t *eval_lambda(env_t *env, lambda_t *lamb, cell_t *args) {
 		args = args->cdr.p, lambarg = lambarg->cdr.p)
 		env_set(lambenv,lambarg->car.p->cdr.str,eval(env,args->car.p),
 			true);
-	assert(!lambarg);
+	check(!lambarg);
 
 	// Evaluate the expressions
 	for(lambexpr = lamb->body; lambexpr; lambexpr = lambexpr->cdr.p)
@@ -71,10 +70,10 @@ cell_t *eval(env_t *env, cell_t *sexp) {
 		return env_get(env,sexp->cdr.str,&sexp) ? sexp : NULL;
 
 	default:
-		assert(sexp->car.type > NUM_VAL_TYPES);
+		check(sexp->car.type > NUM_VAL_TYPES);
 
 		op = eval(env,sexp->car.p);
-		assert(op && (op->car.type == VAL_FCN
+		check(op && (op->car.type == VAL_FCN
 			|| op->car.type == VAL_LBA));
 		if(op->car.type == VAL_FCN)
 			return op->cdr.fcn(env,sexp->cdr.p);
@@ -104,7 +103,7 @@ void print(cell_t *sexp) {
 	case VAL_LBA: printf("<lambda>");             break;
 
 	default:
-		assert(sexp->car.type > NUM_VAL_TYPES);
+		check(sexp->car.type > NUM_VAL_TYPES);
 
 		putchar('(');
 		do {
@@ -116,33 +115,15 @@ void print(cell_t *sexp) {
 	}
 }
 
-static void handle_abort(int signum) {
-	// Sanity check
-	if(signum != SIGABRT)
-		raise(signum);
-
-	// Be extremely descriptive and helpful
-	error("caught run-time error");
-
-	// Keep calm and carry on
-	longjmp(abortjmp,1);
-}
-
 void run_file(env_t *env, FILE *in) {
 	cell_t *sexp;
-	void (*oldhandler)(int) ;
 
-	// Catch assertion failures (i.e., run-time errors)
-	if(setjmp(abortjmp) == 0) {
-		oldhandler = signal(SIGABRT,handle_abort);
-		assert(oldhandler != SIG_ERR);
-	}
+	// Catch check failures (i.e., run-time errors)
+	setjmp(checkjmp);
 
 	while(readf(in,&sexp)) {
 		print(eval(env,sexp));
 		putchar('\n');
 	}
-
-	signal(SIGABRT,oldhandler);
 }
 

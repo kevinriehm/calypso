@@ -138,7 +138,7 @@ static cell_t *assign(env_t *env, cell_t *args) {
 	cell_t *sym, *val;
 
 	check(args && args->cdr.p,"too few arguments to =");
-	check(args->cdr.p->cdr.p,"too many arguments to =");
+	check(!args->cdr.p->cdr.p,"too many arguments to =");
 
 	// The symbol to assign to
 	sym = args->car.p;

@@ -19,8 +19,8 @@
 #define check(x, msg) \
 	do { \
 		if(!(x)) { \
-			error("%s: %i: %s(): check failed, %s (%s)", \
-				__FILE__,__LINE__,__func__,msg,#x); \
+			error("%s: %i: %s(): check failed, %s", \
+				__FILE__,__LINE__,__func__,msg); \
 			longjmp(checkjmp,1); \
 		} \
 	} while(0)

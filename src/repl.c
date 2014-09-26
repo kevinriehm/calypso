@@ -135,8 +135,10 @@ void run_file(env_t *env, FILE *in) {
 	setjmp(checkjmp);
 
 	while(true) {
-		if(interactive)
+		if(interactive) {
 			printf("> ");
+			fflush(stdout);
+		}
 
 		if(!readf(in,&sexp))
 			break;

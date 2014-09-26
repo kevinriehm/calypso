@@ -1,5 +1,6 @@
 %{
 #include "cell.h"
+#include "repl.h"
 
 #include "language.tab.h"
 %}
@@ -8,7 +9,8 @@ INT 0|[1-9][0-9]*
 
 %%
 
-[ \n]+ ; // Whitespace
+\  ; // Whitespace
+\n lineno++;
 
 [+-]?{INT}             |
 [+-]?0[Xx][0-9a-fA-F]+ |

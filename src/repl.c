@@ -11,6 +11,8 @@
 extern FILE *yyin;
 extern cell_t *parseroot;
 
+int lineno;
+char *filename;
 jmp_buf checkjmp;
 
 int yyparse(void);
@@ -119,6 +121,9 @@ void print(cell_t *sexp) {
 
 void run_file(env_t *env, FILE *in) {
 	cell_t *sexp;
+
+	// Reset the line counter
+	lineno = 1;
 
 	// Catch check failures (i.e., run-time errors)
 	setjmp(checkjmp);

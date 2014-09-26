@@ -7,6 +7,8 @@
 struct cell;
 struct env;
 
+extern int lineno;
+extern char *filename;
 extern jmp_buf checkjmp;
 
 void run_file(struct env *, FILE *);

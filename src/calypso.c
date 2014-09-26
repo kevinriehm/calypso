@@ -40,15 +40,20 @@ int main(int argc, char **argv) {
 
 	if(argc > 1) {
 		for(i = 1; i < argc; i++) {
-			if(strcmp(argv[i],"-") == 0)
+			if(strcmp(argv[i],"-") == 0) {
+				filename = "stdin";
 				run_file(globals,stdin);
-			else {
+			} else {
+				filename = argv[i];
 				if(in = fopen(argv[i],"r"))
 					run_file(globals,in);
 				else die("cannot open '%s'",argv[i]);
 			}
 		}
-	} else run_file(globals,stdin);
+	} else {
+		filename = "stdin";
+		run_file(globals,stdin);
+	}
 
 	return 0;
 }

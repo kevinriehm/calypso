@@ -1,4 +1,6 @@
 #include <assert.h>
+#include <setjmp.h>
+#include <signal.h>
 #include <stdio.h>
 
 #include "cell.h"
@@ -8,6 +10,8 @@
 
 extern FILE *yyin;
 extern cell_t *parseroot;
+
+static jmp_buf abortjmp;
 
 int yyparse(void);
 
@@ -112,12 +116,33 @@ void print(cell_t *sexp) {
 	}
 }
 
+static void handle_abort(int signum) {
+	// Sanity check
+	if(signum != SIGABRT)
+		raise(signum);
+
+	// Be extremely descriptive and helpful
+	error("caught run-time error");
+
+	// Keep calm and carry on
+	longjmp(abortjmp,1);
+}
+
 void run_file(env_t *env, FILE *in) {
 	cell_t *sexp;
+	void (*oldhandler)(int) ;
+
+	// Catch assertion failures (i.e., run-time errors)
+	if(setjmp(abortjmp) == 0) {
+		oldhandler = signal(SIGABRT,handle_abort);
+		assert(oldhandler != SIG_ERR);
+	}
 
 	while(readf(in,&sexp)) {
 		print(eval(env,sexp));
 		putchar('\n');
 	}
+
+	signal(SIGABRT,oldhandler);
 }
 

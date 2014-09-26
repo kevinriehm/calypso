@@ -32,6 +32,11 @@ nan                             {
 	return CHARACTER;
 }
 
+'\\n' {
+	yylval.chr = '\n';
+	return CHARACTER;
+}
+
 \"([^"]|\\\")*\" {
 	yylval.str = strndup(yytext + 1,yyleng - 2);
 	return STRING;

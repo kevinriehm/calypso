@@ -43,7 +43,7 @@ static cell_t *eval_lambda(env_t *env, lambda_t *lamb, cell_t *args) {
 		args = args->cdr.p, lambarg = lambarg->cdr.p)
 		env_set(lambenv,lambarg->car.p->cdr.str,eval(env,args->car.p),
 			true);
-	check(!lambarg, "too few arguments to lambda expression");
+	check(!lambarg,"too few arguments to lambda expression");
 
 	// Evaluate the expressions
 	for(lambexpr = lamb->body; lambexpr; lambexpr = lambexpr->cdr.p)

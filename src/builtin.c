@@ -127,6 +127,13 @@ static cell_t *lambda(env_t *env, cell_t *args) {
 	return cell_cons_t(VAL_LBA,lamb);
 }
 
+static cell_t *print_lisp(env_t *env, cell_t *args) {
+	for(; args; args = args->cdr.p)
+		print(eval(env,args->car.p));
+
+	return NULL;
+}
+
 static cell_t *quote(env_t *env, cell_t *args) {
 	check(args,"too few arguments to quote");
 	check(!args->cdr.p,"too many arguments to quote");
@@ -245,6 +252,7 @@ void builtin_init(env_t *env) {
 		{"cons",   cons},
 		{"eq",     eq},
 		{"lambda", lambda},
+		{"print",  print_lisp},
 		{"quote",  quote},
 		{"=",      assign},
 		{"+",      add},

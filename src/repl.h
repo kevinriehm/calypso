@@ -13,6 +13,7 @@ extern jmp_buf checkjmp;
 
 void run_file(struct env *, FILE *);
 
+void print(struct cell *);
 struct cell *eval(struct env *, struct cell *);
 
 #endif

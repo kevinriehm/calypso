@@ -81,13 +81,13 @@ static cell_t *eq(env_t *env, cell_t *args) {
 	args = args->cdr.p;
 	b = eval(env,args->car.p);
 
-	check(a->car.type > NUM_VAL_TYPES || b->car.type > NUM_VAL_TYPES,
-		"argument to eq not an atom");
-
 	if(!a || !b)
 		return a || b ? NULL : tsym;
 
-	if(a && b && a->car.type != b->car.type)
+	check(a->car.type < NUM_VAL_TYPES && b->car.type < NUM_VAL_TYPES,
+		"argument to eq not an atom");
+
+	if(a->car.type != b->car.type)
 		return NULL;
 
 	switch(a->car.type) {

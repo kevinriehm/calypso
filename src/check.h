@@ -8,19 +8,19 @@
 #include "util.h"
 
 #ifdef NDEBUG
-#define check(x) \
+#define check(x, msg) \
 	do { \
 		if(!(x)) { \
-			error("runtime exception"); \
+			error("%s",msg); \
 			longjmp(checkjmp,1); \
 		} \
 	} while(0)
 #else
-#define check(x) \
+#define check(x, msg) \
 	do { \
 		if(!(x)) { \
-			error("%s: %i: %s(): check failed ("#x")",__FILE__, \
-				__LINE__,__func__); \
+			error("%s: %i: %s(): check failed, %s (%s)", \
+				__FILE__,__LINE__,__func__,msg,#x); \
 			longjmp(checkjmp,1); \
 		} \
 	} while(0)

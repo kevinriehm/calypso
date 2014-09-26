@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <setjmp.h>
 #include <stdio.h>
 
@@ -38,7 +39,7 @@ static cell_t *eval_lambda(env_t *env, lambda_t *lamb, cell_t *args) {
 		args = args->cdr.p, lambarg = lambarg->cdr.p)
 		env_set(lambenv,lambarg->car.p->cdr.str,eval(env,args->car.p),
 			true);
-	check(!lambarg);
+	check(!lambarg, "too few arguments to lambda expression");
 
 	// Evaluate the expressions
 	for(lambexpr = lamb->body; lambexpr; lambexpr = lambexpr->cdr.p)
@@ -70,11 +71,12 @@ cell_t *eval(env_t *env, cell_t *sexp) {
 		return env_get(env,sexp->cdr.str,&sexp) ? sexp : NULL;
 
 	default:
-		check(sexp->car.type > NUM_VAL_TYPES);
+		assert(sexp->car.type > NUM_VAL_TYPES);
 
 		op = eval(env,sexp->car.p);
 		check(op && (op->car.type == VAL_FCN
-			|| op->car.type == VAL_LBA));
+			|| op->car.type == VAL_LBA),
+			"operator must be a function");
 		if(op->car.type == VAL_FCN)
 			return op->cdr.fcn(env,sexp->cdr.p);
 		else if(op->car.type == VAL_LBA)
@@ -103,7 +105,7 @@ void print(cell_t *sexp) {
 	case VAL_LBA: printf("<lambda>");             break;
 
 	default:
-		check(sexp->car.type > NUM_VAL_TYPES);
+		assert(sexp->car.type > NUM_VAL_TYPES);
 
 		putchar('(');
 		do {

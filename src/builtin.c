@@ -127,9 +127,37 @@ static cell_t *lambda(env_t *env, cell_t *args) {
 	return cell_cons_t(VAL_LBA,lamb);
 }
 
-static cell_t *print_lisp(env_t *env, cell_t *args) {
+static void print_cell(env_t *env, cell_t *args) {
+	if(!args)
+		printf("nil");
+	else switch(args->car.type) {
+	case VAL_NIL: printf("nil"); break;
+	case VAL_SYM: printf("%s",args->cdr.str); break;
+	case VAL_I64: printf("%lli",args->cdr.i64); break;
+	case VAL_DBL: printf("%f",args->cdr.dbl); break;
+	case VAL_CHR: printf("%c",args->cdr.chr); break;
+	case VAL_STR: printf("%s",args->cdr.str); break;
+	case VAL_FCN: printf("<%p>",args->cdr.fcn); break;
+	case VAL_LBA: printf("<lambda>"); break;
+
+	default:
+		assert(args->car.type > NUM_VAL_TYPES);
+
+		putchar('(');
+		do {
+			print_cell(env,args->car.p);
+
+			if(args = args->cdr.p)
+				putchar(' ');
+		} while(args);
+		putchar(')');
+		break;
+	}
+}
+
+static cell_t *print(env_t *env, cell_t *args) {
 	for(; args; args = args->cdr.p)
-		print(eval(env,args->car.p));
+		print_cell(env,eval(env,args->car.p));
 
 	return NULL;
 }
@@ -252,7 +280,7 @@ void builtin_init(env_t *env) {
 		{"cons",   cons},
 		{"eq",     eq},
 		{"lambda", lambda},
-		{"print",  print_lisp},
+		{"print",  print},
 		{"quote",  quote},
 		{"=",      assign},
 		{"+",      add},

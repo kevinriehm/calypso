@@ -103,7 +103,7 @@ cell_t *eval(env_t *env, cell_t *sexp) {
 	return NULL;
 }
 
-void print(cell_t *sexp) {
+static void print(cell_t *sexp) {
 	if(!sexp) {
 		printf("nil");
 		return;

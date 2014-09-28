@@ -48,6 +48,7 @@ int main(int argc, char **argv) {
 				if(in = fopen(argv[i],"r"))
 					run_file(globals,in);
 				else die("cannot open '%s'",argv[i]);
+				fclose(in);
 			}
 		}
 	} else {

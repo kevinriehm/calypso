@@ -1,35 +1,46 @@
 #include <assert.h>
 #include <setjmp.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <unistd.h>
 
 #include "cell.h"
 #include "check.h"
 #include "env.h"
+#include "grammar.h"
 #include "repl.h"
+#include "token.h"
 #include "util.h"
-
-extern FILE *yyin;
-extern cell_t *parseroot;
 
 int lineno;
 char *filename;
 jmp_buf checkjmp;
 
-int yyparse(void);
+void *ParseAlloc(void *(*)(size_t));
+void ParseFree(void *, void (*)(void *));
+void Parse(void *, int, token_value_t, cell_t **);
+void ParseTrace(FILE *, char *);
 
-bool readf(FILE *f, cell_t **cell) {
-	int err;
+bool readf(void *p, stream_t *s, cell_t **cell) {
+	int tok;
+	cell_t sentinel;
+	token_value_t tokval;
 
-	yyin = f;
+	tok = NEWLINE;
+	*cell = &sentinel;
 
-	err = yyparse();
+	do {
+		if(stream_interactive(s) && tok == NEWLINE) {
+			printf("> ");
+			fflush(stdout);
+		}
 
-	if(cell)
-		*cell = parseroot;
+		tok = token_next(s,&tokval);
+		Parse(p,tok,tokval,cell);
+	} while(*cell == &sentinel && tok > 0);
 
-	return !err;
+	return *cell != &sentinel;
 }
 
 static cell_t *eval_lambda(env_t *env, lambda_t *lamb, cell_t *args) {
@@ -122,36 +133,35 @@ void print(cell_t *sexp) {
 }
 
 void run_file(env_t *env, FILE *in) {
+	void *p;
+	stream_t *s;
 	cell_t *sexp;
 	bool interactive;
 
-	// Reset the line counter
-	lineno = 1;
-
-	// Is this an interactive terminal?
-	interactive = isatty(fileno(in));
+	// Set up the parser
+	p = ParseAlloc(malloc);
+	s = stream_cons_f(in);
 
 	// Catch check failures (i.e., run-time errors)
 	setjmp(checkjmp);
 
 	while(true) {
-		if(interactive) {
-			printf("> ");
-			fflush(stdout);
-		}
-
-		if(!readf(in,&sexp))
+		if(!readf(p,s,&sexp))
 			break;
 
 		sexp = eval(env,sexp);
 
-		if(interactive) {
+		if(stream_interactive(s)) {
 			print(sexp);
 			putchar('\n');
 		}
 	}
 
-	if(interactive)
+	if(stream_interactive(s))
 		putchar('\n');
+
+	// Clean up
+	stream_free(s);
+	ParseFree(p,free);
 }
 

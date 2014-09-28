@@ -127,6 +127,20 @@ static cell_t *lambda(env_t *env, cell_t *args) {
 	return cell_cons_t(VAL_LBA,lamb);
 }
 
+static cell_t *list(env_t *env, cell_t *args) {
+	cell_t *head, **tail;
+
+	head = NULL;
+	tail = &head;
+
+	for(; args; args = args->cdr.p) {
+		*tail = cell_cons(eval(env,args->car.p),NULL);
+		tail = &(*tail)->cdr.p;
+	}
+
+	return head;
+}
+
 static void print_cell(env_t *env, cell_t *args) {
 	if(!args)
 		printf("nil");
@@ -280,6 +294,7 @@ void builtin_init(env_t *env) {
 		{"cons",   cons},
 		{"eq",     eq},
 		{"lambda", lambda},
+		{"list",   list},
 		{"print",  print},
 		{"quote",  quote},
 		{"=",      assign},

@@ -30,6 +30,10 @@ struct stream {
 	unsigned lineno;
 
 	bool tokinited;
+
+	// Mini-buffer stuff
+	int byte;
+	char *bytep;
 };
 
 stream_t *stream_cons_f(FILE *f) {
@@ -120,12 +124,77 @@ refill:
 		variable te  s->te;
 		variable ts  s->ts;
 
+		action escaped_char {
+			static const char *eschars = "\"'?\\abfnrtv";
+			static const char *rechars = "\"'?\\\a\b\f\n\r\t\v";
+
+			switch(fc) {
+			case 'a': fc = '\a'; break;
+			case 'b': fc = '\b'; break;
+			case 'f': fc = '\f'; break;
+			case 'n': fc = '\n'; break;
+			case 'r': fc = '\f'; break;
+			case 't': fc = '\t'; break;
+			case 'v': fc = '\v'; break;
+			}
+
+			// Cover up the backslash
+			memmove(fpc - 1,fpc,s->pe - fpc + 1);
+			if(s->eof)
+				s->eof--;
+			s->p--;
+			s->pe--;
+		}
+
+		action escaped_hex_start {
+			s->byte = 0;
+			s->bytep = fpc - 2;
+		}
+
+		action escaped_octal_start {
+			s->byte = 0;
+			s->bytep = fpc - 1;
+		}
+
+		action escaped_hex {
+			s->byte *= 16;
+			s->byte += fc <= '9' ? fc - '0'
+				: 10 + fc - (fc <= 'F' ? 'A' : 'a');
+		}
+
+		action escaped_octal {
+			s->byte *= 8;
+			s->byte += fc - '0';
+		}
+
+		action escaped_byte_end {
+			int n;
+
+			*s->bytep = s->byte;
+
+			// Cover up the whole sequence
+			memmove(s->bytep + 1,fpc,s->pe - fpc + 1);
+			n = fpc - (s->bytep + 1);
+			if(s->eof)
+				s->eof -= n;
+			s->p -= n;
+			s->pe -= n;
+		}
+
 		S = [+\-]?;
 		D = [0-9];
 		E = [Ee] S D+;
 		H = '0x' [0-9a-fA-F]+;
 		I = '0' | [1-9] D*;
 		O = '0' [0-7]+;
+
+		EC = '\\' ([^0-7x] @escaped_char
+		          | [0-7]{1,3} >escaped_octal_start
+		                       $escaped_octal
+		                       %escaped_byte_end
+		          | 'x' ([0-9a-fA-F]+ >escaped_hex_start
+		                              $escaped_hex
+		                              %escaped_byte_end));
 
 		scanner := |*
 			[ \t]+ => { ret = SPACE; fbreak; };
@@ -150,19 +219,13 @@ refill:
 				fbreak;
 			};
 
-			'\'' . '\'' => {
+			'\'' ([^'\\] | EC) '\'' => {
 				val->chr = s->ts[1];
 				ret = CHARACTER;
 				fbreak;
 			};
 
-			'\'\\n\'' => {
-				val->chr = '\n';
-				ret = CHARACTER;
-				fbreak;
-			};
-
-			'"' ([^"] | '\\"')* '"' => {
+			'"' ([^"\\] | EC)* '"' => {
 				val->str = strndup(s->ts + 1,
 					s->te - s->ts - 2);
 				ret = STRING;
@@ -182,9 +245,7 @@ refill:
 
 	if(s->cs == %%{ write error; }%%) {
 		error("scanner error");
-	}
-
-	if(!ret && s->eof != s->pe)
+	} else if(!ret && s->eof != s->pe)
 		goto refill;
 
 	return ret;

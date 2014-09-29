@@ -97,11 +97,11 @@ static cell_t *eq(env_t *env, cell_t *args) {
 	args = args->cdr.p;
 	b = eval(env,args->car.p);
 
-	if(!cell_is_atom(a) || !cell_is_atom(b))
-		return NULL;
-
 	if(!a || !b)
 		return a || b ? NULL : tsym;
+
+	if(a == b)
+		return tsym;
 
 	if(a->car.type != b->car.type)
 		return NULL;

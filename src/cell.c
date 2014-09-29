@@ -56,3 +56,12 @@ cell_t *cell_dup(cell_t *cell) {
 	return copy;
 }
 
+bool cell_is_atom(cell_t *cell) {
+	return !cell || cell->car.type < NUM_VAL_TYPES;
+}
+
+bool cell_is_list(cell_t *cell) {
+	return !cell || cell->car.type > NUM_VAL_TYPES
+		|| cell->car.type == VAL_NIL;
+}
+

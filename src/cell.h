@@ -1,6 +1,7 @@
 #ifndef CELL_H
 #define CELL_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 struct env;
@@ -50,6 +51,9 @@ typedef struct cell {
 cell_t *cell_cons(cell_t *, cell_t *);
 cell_t *cell_cons_t(enum cell_type, ...);
 cell_t *cell_dup(cell_t *);
+
+bool cell_is_atom(cell_t *);
+bool cell_is_list(cell_t *);
 
 #endif
 

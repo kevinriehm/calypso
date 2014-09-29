@@ -17,8 +17,7 @@ static cell_t *append(env_t *env, cell_t *args) {
 	for(head = NULL, tail = &head; args; args = args->cdr.p) {
 		val = eval(env,args->car.p);
 
-		check(val->car.type > NUM_VAL_TYPES,
-			"arguments to append must be lists");
+		check(cell_is_list(val),"arguments to append must be lists");
 
 		if(args->cdr.p) {
 			for(; val; val = val->cdr.p) {
@@ -34,17 +33,15 @@ static cell_t *append(env_t *env, cell_t *args) {
 static cell_t *atom(env_t *env, cell_t *args) {
 	check(args && !args->cdr.p,"too many arguments to atom");
 
-	args = eval(env,args->car.p);
-
-	return !args || args->car.type < NUM_VAL_TYPES ? tsym : NULL;
+	return cell_is_atom(eval(env,args->car.p)) ? tsym : NULL;
 }
 
 static cell_t *car(env_t *env, cell_t *args) {
 	check(args && !args->cdr.p,"too many arguments to car");
 	args = eval(env,args->car.p);
 
-	check(args && args->car.type > NUM_VAL_TYPES,
-		"argument to car must be a list");
+	check(args && cell_is_list(args),
+		"argument to car must be a non-empty list");
 
 	return args->car.p;
 }
@@ -54,8 +51,8 @@ static cell_t *cdr(env_t *env, cell_t *args) {
 		"too many arguments to cdr");
 	args = eval(env,args->car.p);
 
-	check(args && args->car.type > NUM_VAL_TYPES,
-		"argument to cdr must be a list");
+	check(args && cell_is_list(args),
+		"argument to cdr must be a non-empty list");
 
 	return args->cdr.p;
 }
@@ -66,7 +63,7 @@ static cell_t *cond(env_t *env, cell_t *args) {
 	for(; args; args = args->cdr.p) {
 		pair = args->car.p;
 		check(pair && pair->cdr.p && !pair->cdr.p->cdr.p,
-			"argument to cond not a pair");
+			"argument to cond must be a pair");
 
 		if(eval(env,pair->car.p))
 			return eval(env,pair->cdr.p->car.p);
@@ -85,8 +82,7 @@ static cell_t *cons(env_t *env, cell_t *args) {
 	args = args->cdr.p;
 	b = eval(env,args->car.p);
 
-	check(!b || b->car.type > NUM_VAL_TYPES,
-		"second argument to cons not a list");
+	check(cell_is_list(b),"second argument to cons must be a list");
 
 	return cell_cons(a,b);
 }
@@ -101,17 +97,16 @@ static cell_t *eq(env_t *env, cell_t *args) {
 	args = args->cdr.p;
 	b = eval(env,args->car.p);
 
+	if(!cell_is_atom(a) || !cell_is_atom(b))
+		return NULL;
+
 	if(!a || !b)
 		return a || b ? NULL : tsym;
-
-	check(a->car.type < NUM_VAL_TYPES && b->car.type < NUM_VAL_TYPES,
-		"argument to eq not an atom");
 
 	if(a->car.type != b->car.type)
 		return NULL;
 
 	switch(a->car.type) {
-	case VAL_NIL: return tsym;
 	case VAL_SYM: return strcmp(a->cdr.str,b->cdr.str) == 0 ? tsym : NULL;
 	case VAL_I64: return a->cdr.i64 == b->cdr.i64 ? tsym : NULL;
 	case VAL_DBL: return a->cdr.dbl == b->cdr.dbl ? tsym : NULL;
@@ -165,7 +160,6 @@ static void print_cell(env_t *env, cell_t *args) {
 	if(!args)
 		printf("nil");
 	else switch(args->car.type) {
-	case VAL_NIL: printf("nil"); break;
 	case VAL_SYM: printf("%s",args->cdr.str); break;
 	case VAL_I64: printf("%lli",args->cdr.i64); break;
 	case VAL_DBL: printf("%f",args->cdr.dbl); break;
@@ -174,8 +168,9 @@ static void print_cell(env_t *env, cell_t *args) {
 	case VAL_FCN: printf("<%p>",args->cdr.fcn); break;
 	case VAL_LBA: printf("<lambda>"); break;
 
+	case VAL_NIL:
 	default:
-		assert(args->car.type > NUM_VAL_TYPES);
+		assert(cell_is_list(args));
 
 		putchar('(');
 		do {

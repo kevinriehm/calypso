@@ -74,7 +74,6 @@ cell_t *eval(env_t *env, cell_t *sexp) {
 		return sexp;
 
 	switch(sexp->car.type) {
-	case VAL_NIL:
 	case VAL_I64:
 	case VAL_DBL:
 	case VAL_CHR:
@@ -85,8 +84,9 @@ cell_t *eval(env_t *env, cell_t *sexp) {
 	case VAL_SYM:
 		return env_get(env,sexp->cdr.str,&sexp) ? sexp : NULL;
 
+	case VAL_NIL:
 	default:
-		assert(sexp->car.type > NUM_VAL_TYPES);
+		assert(cell_is_list(sexp));
 
 		op = eval(env,sexp->car.p);
 		check(op && (op->car.type == VAL_FCN
@@ -110,7 +110,6 @@ static void print(cell_t *sexp) {
 	}
 
 	switch(sexp->car.type) {
-	case VAL_NIL: printf("nil");                  break;
 	case VAL_SYM: printf("%s",sexp->cdr.str);     break;
 	case VAL_I64: printf("%lli",sexp->cdr.i64);   break;
 	case VAL_DBL: printf("%f",sexp->cdr.dbl);     break;
@@ -119,8 +118,9 @@ static void print(cell_t *sexp) {
 	case VAL_FCN: printf("<%p>",sexp->cdr.dbl);   break;
 	case VAL_LBA: printf("<lambda>");             break;
 
+	case VAL_NIL:
 	default:
-		assert(sexp->car.type > NUM_VAL_TYPES);
+		assert(cell_is_list(sexp));
 
 		putchar('(');
 		do {

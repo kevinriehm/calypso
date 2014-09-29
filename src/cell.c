@@ -1,5 +1,6 @@
 #include <stdarg.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "cell.h"
 #include "env.h"
@@ -44,5 +45,14 @@ cell_t *cell_cons_t(enum cell_type type, ...) {
 	va_end(ap);
 
 	return cell;
+}
+
+cell_t *cell_dup(cell_t *cell) {
+	cell_t *copy;
+
+	copy = malloc(sizeof *copy);
+	memcpy(copy,cell,sizeof *copy);
+
+	return copy;
 }
 

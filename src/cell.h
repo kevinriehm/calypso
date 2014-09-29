@@ -49,6 +49,7 @@ typedef struct cell {
 
 cell_t *cell_cons(cell_t *, cell_t *);
 cell_t *cell_cons_t(enum cell_type, ...);
+cell_t *cell_dup(cell_t *);
 
 #endif
 

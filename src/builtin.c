@@ -11,6 +11,26 @@
 
 static cell_t *tsym;
 
+static cell_t *append(env_t *env, cell_t *args) {
+	cell_t *head, **tail, *val;
+
+	for(head = NULL, tail = &head; args; args = args->cdr.p) {
+		val = eval(env,args->car.p);
+
+		check(val->car.type > NUM_VAL_TYPES,
+			"arguments to append must be lists");
+
+		if(args->cdr.p) {
+			for(; val; val = val->cdr.p) {
+				*tail = cell_dup(val);
+				tail = &(*tail)->cdr.p;
+			}
+		} else *tail = val;
+	}
+
+	return head;
+}
+
 static cell_t *atom(env_t *env, cell_t *args) {
 	check(args && !args->cdr.p,"too many arguments to atom");
 
@@ -287,6 +307,7 @@ void builtin_init(env_t *env) {
 		char *name;
 		cell_t *(*func)(env_t *, cell_t *);
 	} funcs[] = {
+		{"append", append},
 		{"atom",   atom},
 		{"car",    car},
 		{"cdr",    cdr},

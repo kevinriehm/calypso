@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include "grammar.h"
+#include "repl.h"
 #include "token.h"
 #include "util.h"
 
@@ -197,12 +198,15 @@ refill:
 		                              %escaped_byte_end));
 
 		scanner := |*
-			[ \t]+ => { ret = SPACE; fbreak; };
-			'\n'   => { s->lineno++; ret = NEWLINE; fbreak; };
+			[ \t];
+			'\n' => { lineno++; ret = NEWLINE; fbreak; };
 
 			'(' => { ret = LPAREN; fbreak; };
 			')' => { ret = RPAREN; fbreak; };
 			'\'' => { ret = QUOTE; fbreak; };
+			'`' => { ret = BQUOTE; fbreak; };
+			',' => { ret = COMMA;  fbreak; };
+			'@' => { ret = AT;     fbreak; };
 
 			S I | S H | S O => {
 				val->i64 = strtoll(s->ts,NULL,0);

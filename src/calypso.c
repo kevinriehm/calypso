@@ -8,6 +8,8 @@
 #include "repl.h"
 #include "util.h"
 
+void grammar_init();
+
 typedef struct string {
 	char *s;
 	unsigned cap, len;
@@ -37,6 +39,7 @@ int main(int argc, char **argv) {
 	globals = env_cons(NULL);
 
 	builtin_init(globals);
+	grammar_init();
 
 	if(argc > 1) {
 		for(i = 1; i < argc; i++) {

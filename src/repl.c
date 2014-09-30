@@ -29,7 +29,7 @@ bool readf(void *p, stream_t *s, cell_t **cell) {
 
 	tok = NEWLINE;
 	*cell = &sentinel;
-
+ParseTrace(stdout,"lemon: ");
 	do {
 		if(stream_interactive(s) && tok == NEWLINE) {
 			printf("> ");
@@ -103,7 +103,7 @@ cell_t *eval(env_t *env, cell_t *sexp) {
 	return NULL;
 }
 
-static void print(cell_t *sexp) {
+void print(cell_t *sexp) {
 	if(!sexp) {
 		printf("nil");
 		return;
@@ -124,8 +124,14 @@ static void print(cell_t *sexp) {
 
 		putchar('(');
 		do {
-			print(sexp->car.p);
-			if(sexp->cdr.p) putchar(' ');
+			if(cell_is_list(sexp)) {
+				print(sexp->car.p);
+				if(sexp->cdr.p)
+					putchar(' ');
+			} else {
+				printf(" . ");
+				print(sexp);
+			}
 		} while(sexp = sexp->cdr.p);
 		putchar(')');
 		break;

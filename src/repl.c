@@ -24,20 +24,28 @@ void ParseTrace(FILE *, char *);
 
 bool readf(void *p, stream_t *s, cell_t **cell) {
 	int tok;
+	uint32_t level;
 	cell_t sentinel;
 	token_value_t tokval;
 
-	tok = NEWLINE;
+	level = 0;
+
 	*cell = &sentinel;
 
-	do {
-		if(stream_interactive(s) && tok == NEWLINE) {
-			printf("> ");
-			fflush(stdout);
-		}
+	if(stream_interactive(s)) {
+		printf("> ");
+		fflush(stdout);
+	}
 
+	do {
 		tok = token_next(s,&tokval);
 		Parse(p,tok,tokval,cell);
+
+		if(tok == LPAREN) level++;
+		if(tok == RPAREN) level--;
+
+		if(!level && (tok == RPAREN || tok == SYMBOL))
+			Parse(p,0,tokval,cell);
 	} while(*cell == &sentinel && tok > 0);
 
 	return *cell != &sentinel;

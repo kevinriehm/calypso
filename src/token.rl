@@ -199,7 +199,7 @@ refill:
 
 		scanner := |*
 			[ \t];
-			'\n' => { lineno++; ret = NEWLINE; fbreak; };
+			'\n' => { lineno++; };
 
 			'(' => { ret = LPAREN; fbreak; };
 			')' => { ret = RPAREN; fbreak; };

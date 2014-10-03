@@ -191,6 +191,64 @@ static cell_t *print(env_t *env, cell_t *args) {
 	return NULL;
 }
 
+static cell_t *quasiquote_unquote(env_t *env, cell_t *sexp, bool *splice) {
+	bool subsplice;
+	cell_t *cell, *head, **tail;
+
+	// Default
+	if(splice)
+		*splice = false;
+
+	// atom
+	if(cell_is_atom(sexp))
+		return sexp;
+
+	// ,sexp
+	if(sexp->car.p->car.type == VAL_SYM
+		&& strcmp(sexp->car.p->cdr.str,"unquote") == 0) {
+		sexp = sexp->cdr.p;
+
+		check(sexp,"too few arguments to unquote");
+		check(!sexp->cdr.p,"too many arguments to unquote");
+
+		return eval(env,sexp->car.p);
+	}
+
+	// ,@sexp
+	if(sexp->car.p->car.type == VAL_SYM
+		&& strcmp(sexp->car.p->cdr.str,"unquote-splicing") == 0) {
+		sexp = sexp->cdr.p;
+
+		check(splice,"syntax `,@sexp is undefined");
+		check(sexp,"too few arguments to unquote-splicing");
+		check(!sexp->cdr.p,"too many arguments to unquote-splicing");
+
+		*splice = true;
+
+		return eval(env,sexp->car.p);
+	}
+
+	// (... ,sexp ... ,@sexp ...)
+	for(head = sexp, tail = &head; sexp; sexp = sexp->cdr.p) {
+		cell = quasiquote_unquote(env,sexp->car.p,&subsplice);
+
+		if(subsplice)
+			*tail = cell;
+		else *tail = cell_cons(cell,NULL);
+
+		for(; *tail; tail = &(*tail)->cdr.p);
+	}
+
+	return head;
+}
+
+static cell_t *quasiquote(env_t *env, cell_t *args) {
+	check(args,"too few arguments to quasiquote");
+	check(!args->cdr.p,"too many arguments to quasiquote");
+
+	return quasiquote_unquote(env,args->car.p,NULL);
+}
+
 static cell_t *quote(env_t *env, cell_t *args) {
 	check(args,"too few arguments to quote");
 	check(!args->cdr.p,"too many arguments to quote");
@@ -302,20 +360,21 @@ void builtin_init(env_t *env) {
 		char *name;
 		cell_t *(*func)(env_t *, cell_t *);
 	} funcs[] = {
-		{"append", append},
-		{"atom",   atom},
-		{"car",    car},
-		{"cdr",    cdr},
-		{"cond",   cond},
-		{"cons",   cons},
-		{"eq",     eq},
-		{"lambda", lambda},
-		{"list",   list},
-		{"print",  print},
-		{"quote",  quote},
-		{"=",      assign},
-		{"+",      add},
-		{"-",      sub},
+		{"append",    append},
+		{"atom",      atom},
+		{"car",       car},
+		{"cdr",       cdr},
+		{"cond",      cond},
+		{"cons",      cons},
+		{"eq",        eq},
+		{"lambda",    lambda},
+		{"list",      list},
+		{"print",     print},
+		{"quasiquote",quasiquote},
+		{"quote",     quote},
+		{"=",         assign},
+		{"+",         add},
+		{"-",         sub},
 		{NULL, NULL}
 	};
 

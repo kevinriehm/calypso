@@ -29,7 +29,7 @@ bool readf(void *p, stream_t *s, cell_t **cell) {
 
 	tok = NEWLINE;
 	*cell = &sentinel;
-ParseTrace(stdout,"lemon: ");
+
 	do {
 		if(stream_interactive(s) && tok == NEWLINE) {
 			printf("> ");

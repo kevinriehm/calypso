@@ -65,6 +65,7 @@ static cell_t *eval_lambda(env_t *env, lambda_t *lamb, cell_t *args) {
 	check(!lambarg,"too few arguments to lambda expression");
 
 	// Evaluate the expressions
+	val = NULL;
 	for(lambexpr = lamb->body; lambexpr; lambexpr = lambexpr->cdr.p)
 		val = eval(lambenv,lambexpr->car.p);
 

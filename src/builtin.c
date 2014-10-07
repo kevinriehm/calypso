@@ -135,6 +135,7 @@ static cell_t *lambda(env_t *env, cell_t *args) {
 	// Set up the lambda
 	lamb = malloc(sizeof *lamb);
 	assert(lamb);
+	lamb->ismacro = false;
 	lamb->env = env_ref(env);
 	lamb->args = args->car.p;
 	lamb->body = args->cdr.p;
@@ -156,17 +157,34 @@ static cell_t *list(env_t *env, cell_t *args) {
 	return head;
 }
 
+static cell_t *macro(env_t *env, cell_t *args) {
+	lambda_t *mac;
+
+	check(args,"missing macro parameter list");
+
+	// Set up the macto
+	mac = malloc(sizeof *mac);
+	assert(mac);
+	mac->ismacro = true;
+	mac->env = env_ref(env);
+	mac->args = args->car.p;
+	mac->body = args->cdr.p;
+
+	return cell_cons_t(VAL_LBA,mac);
+}
+
 static void print_cell(env_t *env, cell_t *args) {
 	if(!args)
 		printf("nil");
 	else switch(args->car.type) {
-	case VAL_SYM: printf("%s",args->cdr.str); break;
+	case VAL_SYM: printf("%s",args->cdr.str);   break;
 	case VAL_I64: printf("%lli",args->cdr.i64); break;
-	case VAL_DBL: printf("%f",args->cdr.dbl); break;
-	case VAL_CHR: printf("%c",args->cdr.chr); break;
-	case VAL_STR: printf("%s",args->cdr.str); break;
+	case VAL_DBL: printf("%f",args->cdr.dbl);   break;
+	case VAL_CHR: printf("%c",args->cdr.chr);   break;
+	case VAL_STR: printf("%s",args->cdr.str);   break;
 	case VAL_FCN: printf("<%p>",args->cdr.fcn); break;
-	case VAL_LBA: printf("<lambda>"); break;
+	case VAL_LBA: printf("<%s>",args->cdr.lba->ismacro
+		? "macro" : "lambda");              break;
 
 	case VAL_NIL:
 	default:
@@ -369,6 +387,7 @@ void builtin_init(env_t *env) {
 		{"eq",        eq},
 		{"lambda",    lambda},
 		{"list",      list},
+		{"macro",     macro},
 		{"print",     print},
 		{"quasiquote",quasiquote},
 		{"quote",     quote},

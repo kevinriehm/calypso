@@ -74,6 +74,40 @@ static cell_t *eval_lambda(env_t *env, lambda_t *lamb, cell_t *args) {
 	return val;
 }
 
+static void bind_macro_args(env_t *env, cell_t *template, cell_t *args) {
+	for(; args && template;
+		args = args->cdr.p, template = template->cdr.p) {
+		if(cell_is_list(template->car.p))
+			bind_macro_args(env,template->car.p,args->car.p);
+		else if(template->car.p->car.type == VAL_SYM)
+			env_set(env,template->car.p->cdr.str,args->car.p,true);
+		else check(false,"mal-formed macro arguments");
+	}
+
+	check(!template,"too few arguments to macro expression");
+}
+
+static cell_t *eval_macro(env_t *env, lambda_t *mac, cell_t *args) {
+	env_t *macenv;
+	cell_t *expr, *val;
+
+	macenv = env_cons(mac->env);
+
+	// Bind the arguments
+	bind_macro_args(macenv,mac->args,args);
+
+	// Expand it
+	for(expr = mac->body, val = NULL; expr; expr = expr->cdr.p)
+		val = eval(macenv,expr->car.p);
+
+	// Then evaluate the expansion
+	val = eval(env,val);
+
+	env_free(macenv);
+
+	return val;
+}
+
 cell_t *eval(env_t *env, cell_t *sexp) {
 	env_t *lambenv;
 	lambda_t *lamb;
@@ -103,8 +137,11 @@ cell_t *eval(env_t *env, cell_t *sexp) {
 			"operator must be a function");
 		if(op->car.type == VAL_FCN)
 			return op->cdr.fcn(env,sexp->cdr.p);
-		else if(op->car.type == VAL_LBA)
-			return eval_lambda(env,op->cdr.lba,sexp->cdr.p);
+		else if(op->car.type == VAL_LBA) {
+			return op->cdr.lba->ismacro
+				? eval_macro(env,op->cdr.lba,sexp->cdr.p)
+				: eval_lambda(env,op->cdr.lba,sexp->cdr.p);
+		}
 	}
 
 	error("unhandled s-expression of type %i",sexp->car.type);
@@ -125,7 +162,8 @@ void print(cell_t *sexp) {
 	case VAL_CHR: printf("'%c'",sexp->cdr.chr);   break;
 	case VAL_STR: printf("\"%s\"",sexp->cdr.str); break;
 	case VAL_FCN: printf("<%p>",sexp->cdr.dbl);   break;
-	case VAL_LBA: printf("<lambda>");             break;
+	case VAL_LBA: printf("<%s>",sexp->cdr.lba->ismacro
+		? "macro" : "lambda"); break;
 
 	case VAL_NIL:
 	default:

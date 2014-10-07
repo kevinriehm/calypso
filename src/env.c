@@ -44,6 +44,10 @@ env_t *env_ref(env_t *env) {
 	return env;
 }
 
+env_t *env_parent(env_t *env) {
+	return env ? env->parent : NULL;
+}
+
 bool env_get(env_t *env, char *name, cell_t **val) {
 	bool exists;
 	hvalue_t hval;

@@ -7,6 +7,7 @@
 struct env;
 
 typedef struct lambda {
+	bool ismacro;
 	struct env *env;
 	struct cell *args;
 	struct cell *body;

@@ -77,7 +77,7 @@ static cell_t *eval_lambda(env_t *env, lambda_t *lamb, cell_t *args) {
 static void bind_macro_args(env_t *env, cell_t *template, cell_t *args) {
 	for(; args && template;
 		args = args->cdr.p, template = template->cdr.p) {
-		if(cell_is_list(template->car.p))
+		if(cell_is_list(template->car.p) && cell_is_list(args->car.p))
 			bind_macro_args(env,template->car.p,args->car.p);
 		else if(template->car.p->car.type == VAL_SYM)
 			env_set(env,template->car.p->cdr.str,args->car.p,true);

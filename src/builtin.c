@@ -9,7 +9,11 @@
 #include "repl.h"
 #include "util.h"
 
-static cell_t *tsym;
+static char *str_t;
+static char *str_unquote;
+static char *str_unquote_splicing;
+
+static cell_t *sym_t;
 
 static cell_t *append(env_t *env, cell_t *args) {
 	cell_t *head, **tail, *val;
@@ -33,7 +37,7 @@ static cell_t *append(env_t *env, cell_t *args) {
 static cell_t *atom(env_t *env, cell_t *args) {
 	check(args && !args->cdr.p,"too many arguments to atom");
 
-	return cell_is_atom(eval(env,args->car.p)) ? tsym : NULL;
+	return cell_is_atom(eval(env,args->car.p)) ? sym_t : NULL;
 }
 
 static cell_t *car(env_t *env, cell_t *args) {
@@ -98,22 +102,22 @@ static cell_t *eq(env_t *env, cell_t *args) {
 	b = eval(env,args->car.p);
 
 	if(!a || !b)
-		return a || b ? NULL : tsym;
+		return a || b ? NULL : sym_t;
 
 	if(a == b)
-		return tsym;
+		return sym_t;
 
 	if(a->car.type != b->car.type)
 		return NULL;
 
 	switch(a->car.type) {
-	case VAL_SYM: return strcmp(a->cdr.str,b->cdr.str) == 0 ? tsym : NULL;
-	case VAL_I64: return a->cdr.i64 == b->cdr.i64 ? tsym : NULL;
-	case VAL_DBL: return a->cdr.dbl == b->cdr.dbl ? tsym : NULL;
-	case VAL_CHR: return a->cdr.chr == b->cdr.chr ? tsym : NULL;
-	case VAL_STR: return strcmp(a->cdr.str,b->cdr.str) == 0 ? tsym : NULL;
-	case VAL_FCN: return a->cdr.fcn == b->cdr.fcn ? tsym : NULL;
-	case VAL_LBA: return a->cdr.lba == b->cdr.lba ? tsym : NULL;
+	case VAL_SYM: return a->cdr.str == b->cdr.str ? sym_t : NULL;
+	case VAL_I64: return a->cdr.i64 == b->cdr.i64 ? sym_t : NULL;
+	case VAL_DBL: return a->cdr.dbl == b->cdr.dbl ? sym_t : NULL;
+	case VAL_CHR: return a->cdr.chr == b->cdr.chr ? sym_t : NULL;
+	case VAL_STR: return strcmp(a->cdr.str,b->cdr.str) == 0 ? sym_t : NULL;
+	case VAL_FCN: return a->cdr.fcn == b->cdr.fcn ? sym_t : NULL;
+	case VAL_LBA: return a->cdr.lba == b->cdr.lba ? sym_t : NULL;
 
 	default:
 		error("unhandled value in eq, type %i",a->car.type);
@@ -223,7 +227,7 @@ static cell_t *quasiquote_unquote(env_t *env, cell_t *sexp, bool *splice) {
 
 	// ,sexp
 	if(sexp->car.p->car.type == VAL_SYM
-		&& strcmp(sexp->car.p->cdr.str,"unquote") == 0) {
+		&& sexp->car.p->cdr.str == str_unquote) {
 		sexp = sexp->cdr.p;
 
 		check(sexp,"too few arguments to unquote");
@@ -234,7 +238,7 @@ static cell_t *quasiquote_unquote(env_t *env, cell_t *sexp, bool *splice) {
 
 	// ,@sexp
 	if(sexp->car.p->car.type == VAL_SYM
-		&& strcmp(sexp->car.p->cdr.str,"unquote-splicing") == 0) {
+		&& sexp->car.p->cdr.str == str_unquote_splicing) {
 		sexp = sexp->cdr.p;
 
 		check(splice,"syntax `,@sexp is undefined");
@@ -397,13 +401,18 @@ void builtin_init(env_t *env) {
 		{NULL, NULL}
 	};
 
+	// Cache important symbols
+	str_t = cell_str_intern("t");
+	str_unquote = cell_str_intern("unquote");
+	str_unquote_splicing = cell_str_intern("unquote-splicing");
+
 	// Canonical truth symbol
-	tsym = cell_cons_t(VAL_SYM,"t");
-	env_set(env,tsym->cdr.str,tsym,true);
+	sym_t = cell_cons_t(VAL_SYM,str_t);
+	env_set(env,str_t,sym_t,true);
 
 	// Builtin operators
 	for(int i = 0; funcs[i].name; i++)
-		env_set(env,funcs[i].name,cell_cons_t(VAL_FCN,funcs[i].func),
-			true);
+		env_set(env,cell_str_intern(funcs[i].name),
+			cell_cons_t(VAL_FCN,funcs[i].func),true);
 }
 

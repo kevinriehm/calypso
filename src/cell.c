@@ -4,6 +4,7 @@
 
 #include "cell.h"
 #include "env.h"
+#include "htable.h"
 #include "util.h"
 
 cell_t *cell_cons(cell_t *car, cell_t *cdr) {
@@ -63,5 +64,14 @@ bool cell_is_atom(cell_t *cell) {
 bool cell_is_list(cell_t *cell) {
 	return !cell || cell->car.type > NUM_VAL_TYPES
 		|| cell->car.type == VAL_NIL;
+}
+
+char *cell_str_intern(char *str) {
+	static htable_t *interned = NULL;
+
+	if(!interned)
+		interned = htable_cons(0);
+
+	return htable_intern(interned,str,strlen(str));
 }
 

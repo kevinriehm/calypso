@@ -48,13 +48,13 @@ env_t *env_parent(env_t *env) {
 	return env ? env->parent : NULL;
 }
 
-bool env_get(env_t *env, char *name, cell_t **val) {
+bool env_get(env_t *env, char *sym, cell_t **val) {
 	bool exists;
 	hvalue_t hval;
 
-	assert(env && name);
+	assert(env && sym);
 
-	do exists = htable_lookup(env->tab,name,&hval);
+	do exists = htable_lookup(env->tab,&sym,sizeof sym,&hval);
 	while(!exists && (env = env->parent));
 
 	if(exists && val)
@@ -63,22 +63,22 @@ bool env_get(env_t *env, char *name, cell_t **val) {
 	return exists;
 }
 
-void env_set(env_t *env, char *name, cell_t *val, bool local) {
+void env_set(env_t *env, char *sym, cell_t *val, bool local) {
 	bool exists;
 	env_t *localenv;
 
-	assert(env && name);
+	assert(env && sym);
 
 	if(!local) {
 		localenv = env;
 
-		do exists = htable_lookup(env->tab,name,NULL);
+		do exists = htable_lookup(env->tab,&sym,sizeof sym,NULL);
 		while(!exists && (env = env->parent));
 
 		if(!exists)
 			env = localenv;
 	}
 
-	htable_insert(env->tab,name,(hvalue_t) { .p = val });
+	htable_insert(env->tab,&sym,sizeof sym,(hvalue_t) { .p = val });
 }
 

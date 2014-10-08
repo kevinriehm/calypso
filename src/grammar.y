@@ -7,7 +7,7 @@
 
 static cell_t *wrap(char *first, cell_t *cell) {
 	return cell_cons(
-		cell_cons_t(VAL_SYM,first),
+		cell_cons_t(VAL_SYM,cell_str_intern(first)),
 		cell_cons(cell,NULL)
 	);
 }
@@ -43,5 +43,5 @@ atom(A) ::= INTEGER(I).   { A = cell_cons_t(VAL_I64,I.i64); }
 atom(A) ::= REAL(R).      { A = cell_cons_t(VAL_DBL,R.dbl); }
 atom(A) ::= CHARACTER(C). { A = cell_cons_t(VAL_CHR,C.chr); }
 atom(A) ::= STRING(S).    { A = cell_cons_t(VAL_STR,S.str); }
-atom(A) ::= SYMBOL(S).    { A = cell_cons_t(VAL_SYM,S.str); }
+atom(A) ::= SYMBOL(S).    { A = cell_cons_t(VAL_SYM,cell_str_intern(S.str)); }
 

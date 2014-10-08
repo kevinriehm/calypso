@@ -56,5 +56,7 @@ cell_t *cell_dup(cell_t *);
 bool cell_is_atom(cell_t *);
 bool cell_is_list(cell_t *);
 
+char *cell_str_intern(char *);
+
 #endif
 

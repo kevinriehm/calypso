@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -5,6 +6,7 @@
 #include <string.h>
 
 #include "htable.h"
+#include "util.h"
 
 #define THRESH_GROW   0.7
 #define THRESH_SHRINK 0.3
@@ -13,10 +15,12 @@
 
 #define HASH_SEED 0xb6871303
 
-#define HASH(key, cap) (murmur3_32(HASH_SEED,(key),strlen(key))%(cap))
+#define HASH(key, keylen, cap) (murmur3_32(HASH_SEED,(key),(keylen))%(cap))
 
 typedef struct hentry {
-	char *key;
+	void *key;
+	uint32_t keylen;
+
 	hvalue_t val;
 
 	struct hentry *next;
@@ -30,14 +34,15 @@ struct htable {
 	hentry_t **entries;
 };
 
-static uint32_t murmur3_32(uint32_t seed, char *key, uint32_t len) {
+static uint32_t murmur3_32(uint32_t seed, void *key, size_t keylen) {
 	static const uint32_t r1 = 15, r2 = 13;
 	static const uint32_t m = 5, n = 0xe6546b64;
 	static const uint32_t c1 = 0xcc9e2d51, c2 = 0x1b873593;
 
-	uint32_t i, k;
+	size_t i;
+	uint32_t k;
 
-	for(i = 0; len - i > 3; i += 4) {
+	for(i = 0; keylen - i > 3; i += 4) {
 		k = *(uint32_t *) (key + i);
 
 		k *= c1;
@@ -49,8 +54,8 @@ static uint32_t murmur3_32(uint32_t seed, char *key, uint32_t len) {
 		seed = seed*m + n;
 	}
 
-	for(k = 0; i < len; i++)
-		k |= *(uint8_t *) (key + i) << 8*(3 - len + i);
+	for(k = 0; i < keylen; i++)
+		k |= *(uint8_t *) (key + i) << 8*(3 - keylen + i);
 
 	k *= c1;
 	k = (k << r1) | (k >> 32 - r1);
@@ -58,7 +63,7 @@ static uint32_t murmur3_32(uint32_t seed, char *key, uint32_t len) {
 
 	seed ^= k;
 
-	seed ^= len;
+	seed ^= keylen;
 
 	seed ^= seed >> 16;
 	seed *= 0x85ebca6b;
@@ -85,7 +90,7 @@ static void htable_resize(htable_t *tab, uint32_t cap) {
 
 	for(int i = 0; i < tab->cap; i++) {
 		for(entry = tab->entries[i]; entry; entry = next) {
-			index = HASH(entry->key,cap);
+			index = HASH(entry->key,entry->keylen,cap);
 
 			next = entry->next;
 			entry->next = entries[index];
@@ -127,14 +132,15 @@ void htable_free(htable_t *tab) {
 	free(tab);
 }
 
-void htable_insert(htable_t *tab, char *key, hvalue_t val) {
+void htable_insert(htable_t *tab, void *key, size_t keylen, hvalue_t val) {
 	uint32_t index;
 	hentry_t *entry;
 
-	index = HASH(key,tab->cap);
+	index = HASH(key,keylen,tab->cap);
 
 	for(entry = tab->entries[index]; entry; entry = entry->next) {
-		if(strcmp(key,entry->key) == 0) {
+		if(entry->keylen == keylen
+			&& memcmp(entry->key,key,keylen) == 0) {
 			// key is already in tab
 			entry->val = val;
 			return;
@@ -143,7 +149,8 @@ void htable_insert(htable_t *tab, char *key, hvalue_t val) {
 
 	// key isn't in tab (yet)
 	entry = malloc(sizeof *entry);
-	entry->key = strdup(key);
+	entry->key = memdup(key,keylen);
+	entry->keylen = keylen;
 	entry->val = val;
 	entry->next = tab->entries[index];
 
@@ -154,14 +161,15 @@ void htable_insert(htable_t *tab, char *key, hvalue_t val) {
 		htable_resize(tab,RESIZE_FACTOR*tab->cap);
 }
 
-bool htable_lookup(htable_t *tab, char *key, hvalue_t *val) {
+bool htable_lookup(htable_t *tab, void *key, size_t keylen, hvalue_t *val) {
 	uint32_t index;
 	hentry_t *entry;
 
-	index = HASH(key,tab->cap);
+	index = HASH(key,keylen,tab->cap);
 
 	for(entry = tab->entries[index]; entry; entry = entry->next) {
-		if(strcmp(key,entry->key) == 0) {
+		if(entry->keylen == keylen
+			&& memcmp(entry->key,key,keylen) == 0) {
 			if(val) *val = entry->val;
 			return true;
 		}
@@ -171,15 +179,16 @@ bool htable_lookup(htable_t *tab, char *key, hvalue_t *val) {
 	return false;
 }
 
-void htable_remove(htable_t *tab, char *key) {
+void htable_remove(htable_t *tab, void *key, size_t keylen) {
 	uint32_t index;
 	hentry_t *entry, *prev;
 
-	index = HASH(key,tab->cap);
+	index = HASH(key,keylen,tab->cap);
 
 	for(prev = NULL, entry = tab->entries[index]; entry;
 		prev = entry, entry = entry->next) {
-		if(strcmp(key,entry->key) == 0) {
+		if(entry->keylen == keylen
+			&& memcmp(entry->key,key,keylen) == 0) {
 			if(prev)
 				prev->next = entry->next;
 			else tab->entries[index] = entry->next;
@@ -196,5 +205,21 @@ void htable_remove(htable_t *tab, char *key) {
 	}
 
 	// key isn't in tab
+}
+
+char *htable_intern(htable_t *tab, void *key, size_t keylen) {
+	uint32_t index;
+	hentry_t *entry;
+
+	while(true) {
+		index = HASH(key,keylen,tab->cap);
+
+		for(entry = tab->entries[index]; entry; entry = entry->next)
+			if(entry->keylen == keylen
+				&& memcmp(key,entry->key,keylen) == 0)
+				return entry->key;
+
+		htable_insert(tab,key,keylen,(hvalue_t) { .p = NULL });
+	}
 }
 

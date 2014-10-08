@@ -14,9 +14,11 @@ typedef union hvalue {
 htable_t *htable_cons(uint32_t);
 void htable_free(htable_t *);
 
-void htable_insert(htable_t *, char *, hvalue_t);
-bool htable_lookup(htable_t *, char *, hvalue_t *);
-void htable_remove(htable_t *, char *);
+void htable_insert(htable_t *, void *, size_t, hvalue_t);
+bool htable_lookup(htable_t *, void *, size_t, hvalue_t *);
+void htable_remove(htable_t *, void *, size_t);
+
+char *htable_intern(htable_t *, void *, size_t);
 
 #endif
 

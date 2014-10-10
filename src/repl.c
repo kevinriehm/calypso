@@ -77,14 +77,19 @@ static cell_t *eval_lambda(env_t *env, lambda_t *lamb, cell_t *args) {
 static void bind_macro_args(env_t *env, cell_t *template, cell_t *args) {
 	for(; args && template;
 		args = args->cdr.p, template = template->cdr.p) {
-		if(cell_is_list(template->car.p) && cell_is_list(args->car.p))
+		if(template->car.type == VAL_SYM) { // Var-args
+			env_set(env,template->cdr.str,args,true);
+			break;
+		} else if(cell_is_list(template->car.p)
+			&& cell_is_list(args->car.p))
 			bind_macro_args(env,template->car.p,args->car.p);
 		else if(template->car.p->car.type == VAL_SYM)
 			env_set(env,template->car.p->cdr.str,args->car.p,true);
 		else check(false,"mal-formed macro arguments");
 	}
 
-	check(!template,"too few arguments to macro expression");
+	check(cell_is_atom(template) || !template,
+		"too few arguments to macro expression");
 }
 
 static cell_t *eval_macro(env_t *env, lambda_t *mac, cell_t *args) {

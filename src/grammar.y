@@ -31,6 +31,14 @@ cmd ::= cmd s_exp(S). { *root = S; }
 
 s_exp(R) ::= atom(A). { R = A; }
 s_exp(R) ::= LPAREN s_exp_list(L) RPAREN. { R = L; }
+s_exp(R) ::= LPAREN s_exp_list(CAR) PERIOD s_exp(CDR) RPAREN. {
+		cell_t *tail;
+
+		for(tail = CAR; tail->cdr.p; tail = tail->cdr.p);
+		tail->cdr.p = CDR;
+
+		R = CAR;
+	}
 s_exp(R) ::= QUOTE s_exp(S). { R = wrap("quote",S); }
 s_exp(R) ::= BQUOTE s_exp(S). { R = wrap("quasiquote",S); }
 s_exp(R) ::= COMMA s_exp(S). { R = wrap("unquote",S); }

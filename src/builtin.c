@@ -86,8 +86,6 @@ static cell_t *cons(env_t *env, cell_t *args) {
 	args = args->cdr.p;
 	b = eval(env,args->car.p);
 
-	check(cell_is_list(b),"second argument to cons must be a list");
-
 	return cell_cons(a,b);
 }
 
@@ -177,7 +175,7 @@ static cell_t *macro(env_t *env, cell_t *args) {
 	return cell_cons_t(VAL_LBA,mac);
 }
 
-static void print_cell(env_t *env, cell_t *args) {
+static void print_cell(cell_t *args) {
 	if(!args)
 		printf("nil");
 	else switch(args->car.type) {
@@ -196,11 +194,16 @@ static void print_cell(env_t *env, cell_t *args) {
 
 		putchar('(');
 		do {
-			print_cell(env,args->car.p);
-
-			if(args = args->cdr.p)
-				putchar(' ');
-		} while(args);
+			if(cell_is_list(args)) {
+				print_cell(args->car.p);
+				if(args->cdr.p)
+					putchar(' ');
+			} else {
+				printf(". ");
+				print_cell(args);
+				break;
+			}
+		} while(args = args->cdr.p);
 		putchar(')');
 		break;
 	}
@@ -208,7 +211,7 @@ static void print_cell(env_t *env, cell_t *args) {
 
 static cell_t *print(env_t *env, cell_t *args) {
 	for(; args; args = args->cdr.p)
-		print_cell(env,eval(env,args->car.p));
+		print_cell(eval(env,args->car.p));
 
 	return NULL;
 }

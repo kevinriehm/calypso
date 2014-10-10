@@ -204,6 +204,7 @@ refill:
 			'(' => { ret = LPAREN; fbreak; };
 			')' => { ret = RPAREN; fbreak; };
 			'\'' => { ret = QUOTE; fbreak; };
+			'.' => { ret = PERIOD; fbreak; };
 			'`' => { ret = BQUOTE; fbreak; };
 			',' => { ret = COMMA;  fbreak; };
 			'@' => { ret = AT;     fbreak; };

@@ -176,8 +176,9 @@ void print(cell_t *sexp) {
 				if(sexp->cdr.p)
 					putchar(' ');
 			} else {
-				printf(" . ");
+				printf(". ");
 				print(sexp);
+				break;
 			}
 		} while(sexp = sexp->cdr.p);
 		putchar(')');

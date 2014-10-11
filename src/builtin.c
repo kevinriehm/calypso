@@ -123,6 +123,19 @@ static cell_t *eq(env_t *env, cell_t *args) {
 	}
 }
 
+static cell_t *gensym(env_t *env, cell_t *args) {
+	static int counter = 0;
+
+	char *str;
+
+	check(!args,"too many arguments to gensym");
+
+	str = malloc(1 + 5 + 1);
+	sprintf(str,"G%05i",counter++%100000);
+
+	return cell_cons_t(VAL_SYM,str);
+}
+
 static cell_t *lambda(env_t *env, cell_t *args) {
 	cell_t *arg;
 	lambda_t *lamb;
@@ -392,6 +405,7 @@ void builtin_init(env_t *env) {
 		{"cond",      cond},
 		{"cons",      cons},
 		{"eq",        eq},
+		{"gensym",    gensym},
 		{"lambda",    lambda},
 		{"list",      list},
 		{"macro",     macro},

@@ -77,6 +77,13 @@ static cell_t *eval_lambda(env_t *env, lambda_t *lamb, cell_t *args) {
 static void bind_macro_args(env_t *env, cell_t *template, cell_t *args) {
 	for(; args && template;
 		args = args->cdr.p, template = template->cdr.p) {
+		// Skip nil in the template
+		while(!template->car.p) {
+			template = template->cdr.p;
+			if(!template)
+				break;
+		}
+
 		if(template->car.type == VAL_SYM) { // Var-args
 			env_set(env,template->cdr.str,args,true);
 			break;

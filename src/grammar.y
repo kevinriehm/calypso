@@ -34,10 +34,10 @@ s_exp(R) ::= LPAREN s_exp_list(L) RPAREN. { R = L; }
 s_exp(R) ::= LPAREN s_exp_list(CAR) PERIOD s_exp(CDR) RPAREN. {
 		cell_t *tail;
 
-		for(tail = CAR; tail->cdr.p; tail = tail->cdr.p);
-		tail->cdr.p = CDR;
+		R = CAR ? CAR : cell_cons(NULL,NULL);
 
-		R = CAR;
+		for(tail = R; tail->cdr.p; tail = tail->cdr.p);
+		tail->cdr.p = CDR;
 	}
 s_exp(R) ::= QUOTE s_exp(S). { R = wrap("quote",S); }
 s_exp(R) ::= BQUOTE s_exp(S). { R = wrap("quasiquote",S); }

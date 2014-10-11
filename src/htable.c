@@ -149,7 +149,8 @@ void htable_insert(htable_t *tab, void *key, size_t keylen, hvalue_t val) {
 
 	// key isn't in tab (yet)
 	entry = malloc(sizeof *entry);
-	entry->key = memdup(key,keylen);
+	entry->key = memdup(key,keylen + 1);
+	((char *) entry->key)[keylen] = '\0';
 	entry->keylen = keylen;
 	entry->val = val;
 	entry->next = tab->entries[index];

@@ -188,6 +188,46 @@ static cell_t *macro(env_t *env, cell_t *args) {
 	return cell_cons_t(VAL_LBA,mac);
 }
 
+static cell_t *macroexpand(env_t *env, cell_t *args) {
+	cell_t *expr, *op;
+
+	check(args && !args->cdr.p,
+		"incorrect number of arguments to macroexpand");
+
+	expr = eval(env,args->car.p);
+
+	while(true) {
+		if(cell_is_atom(expr))
+			return expr;
+
+		op = eval(env,expr->car.p);
+		if(!op || op->car.type != VAL_LBA || !op->cdr.lba->ismacro)
+			return expr;
+
+		expr = expand_macro(op->cdr.lba,expr->cdr.p);
+	}
+
+	return expr;
+}
+
+static cell_t *macroexpand_1(env_t *env, cell_t *args) {
+	cell_t *expr, *op;
+
+	check(args && !args->cdr.p,
+		"incorrect number of arguments to macroexpand-1");
+
+	expr = eval(env,args->car.p);
+
+	if(cell_is_atom(expr))
+		return expr;
+
+	op = eval(env,expr->car.p);
+	if(!op || op->car.type != VAL_LBA || !op->cdr.lba->ismacro)
+		return expr;
+
+	return expand_macro(op->cdr.lba,expr->cdr.p);
+}
+
 static void print_cell(cell_t *args) {
 	if(!args)
 		printf("nil");
@@ -398,23 +438,25 @@ void builtin_init(env_t *env) {
 		char *name;
 		cell_t *(*func)(env_t *, cell_t *);
 	} funcs[] = {
-		{"append",    append},
-		{"atom",      atom},
-		{"car",       car},
-		{"cdr",       cdr},
-		{"cond",      cond},
-		{"cons",      cons},
-		{"eq",        eq},
-		{"gensym",    gensym},
-		{"lambda",    lambda},
-		{"list",      list},
-		{"macro",     macro},
-		{"print",     print},
-		{"quasiquote",quasiquote},
-		{"quote",     quote},
-		{"=",         assign},
-		{"+",         add},
-		{"-",         sub},
+		{"append",       append},
+		{"atom",         atom},
+		{"car",          car},
+		{"cdr",          cdr},
+		{"cond",         cond},
+		{"cons",         cons},
+		{"eq",           eq},
+		{"gensym",       gensym},
+		{"lambda",       lambda},
+		{"list",         list},
+		{"macro",        macro},
+		{"macroexpand",  macroexpand},
+		{"macroexpand-1",macroexpand_1},
+		{"print",        print},
+		{"quasiquote",   quasiquote},
+		{"quote",        quote},
+		{"=",            assign},
+		{"+",            add},
+		{"-",            sub},
 		{NULL, NULL}
 	};
 

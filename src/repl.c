@@ -99,25 +99,26 @@ static void bind_macro_args(env_t *env, cell_t *template, cell_t *args) {
 		"too few arguments to macro expression");
 }
 
-static cell_t *eval_macro(env_t *env, lambda_t *mac, cell_t *args) {
+cell_t *expand_macro(lambda_t *mac, cell_t *args) {
 	env_t *macenv;
-	cell_t *expr, *val;
+	cell_t *expr, *op, *val;
 
+	// Set up the environment
 	macenv = env_cons(mac->env);
-
-	// Bind the arguments
 	bind_macro_args(macenv,mac->args,args);
 
-	// Expand it
+	// Expand!
 	for(expr = mac->body, val = NULL; expr; expr = expr->cdr.p)
 		val = eval(macenv,expr->car.p);
 
-	// Then evaluate the expansion
-	val = eval(env,val);
-
+	// Clean up
 	env_free(macenv);
 
 	return val;
+}
+
+static cell_t *eval_macro(env_t *env, lambda_t *mac, cell_t *args) {
+	return eval(env,expand_macro(mac,args));
 }
 
 cell_t *eval(env_t *env, cell_t *sexp) {

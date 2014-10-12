@@ -123,6 +123,12 @@ static cell_t *eq(env_t *env, cell_t *args) {
 	}
 }
 
+static cell_t *eval_builtin(env_t *env, cell_t *args) {
+	check(!args->cdr.p,"too many arguments to eval");
+
+	return args ? eval(env,eval(env,args->car.p)) : NULL;
+}
+
 static cell_t *gensym(env_t *env, cell_t *args) {
 	static int counter = 0;
 
@@ -445,6 +451,7 @@ void builtin_init(env_t *env) {
 		{"cond",         cond},
 		{"cons",         cons},
 		{"eq",           eq},
+		{"eval",         eval_builtin},
 		{"gensym",       gensym},
 		{"lambda",       lambda},
 		{"list",         list},

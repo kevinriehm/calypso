@@ -33,9 +33,9 @@ void env_free(env_t *env) {
 	if(!env || --env->ref)
 		return;
 
-	env_free(env->parent);
-
 	htable_free(env->tab);
+	env_free(env->parent);
+	free(env);
 }
 
 env_t *env_ref(env_t *env) {

@@ -59,15 +59,14 @@ static cell_t *eval_lambda(env_t *env, lambda_t *lamb, cell_t *args) {
 
 	// Bind the arguments
 	for(lambarg = lamb->args; args && lambarg;
-		args = args->cdr.p, lambarg = lambarg->cdr.p)
-		env_set(lambenv,lambarg->car.p->cdr.str,eval(env,args->car.p),
-			true);
+		args = args->cdr, lambarg = lambarg->cdr)
+		env_set(lambenv,lambarg->car->sym,eval(env,args->car),true);
 	check(!lambarg,"too few arguments to lambda expression");
 
 	// Evaluate the expressions
 	val = NULL;
-	for(lambexpr = lamb->body; lambexpr; lambexpr = lambexpr->cdr.p)
-		val = eval(lambenv,lambexpr->car.p);
+	for(lambexpr = lamb->body; lambexpr; lambexpr = lambexpr->cdr)
+		val = eval(lambenv,lambexpr->car);
 
 	env_free(lambenv);
 
@@ -75,23 +74,22 @@ static cell_t *eval_lambda(env_t *env, lambda_t *lamb, cell_t *args) {
 }
 
 static void bind_macro_args(env_t *env, cell_t *template, cell_t *args) {
-	for(; args && template;
-		args = args->cdr.p, template = template->cdr.p) {
+	for(; args && template; args = args->cdr, template = template->cdr) {
 		// Skip nil in the template
-		while(!template->car.p) {
-			template = template->cdr.p;
+		while(!template->car) {
+			template = template->cdr;
 			if(!template)
 				break;
 		}
 
-		if(template->car.type == VAL_SYM) { // Var-args
-			env_set(env,template->cdr.str,args,true);
+		if(cell_type(template) == VAL_SYM) { // Var-args
+			env_set(env,template->sym,args,true);
 			break;
-		} else if(cell_is_list(template->car.p)
-			&& cell_is_list(args->car.p))
-			bind_macro_args(env,template->car.p,args->car.p);
-		else if(template->car.p->car.type == VAL_SYM)
-			env_set(env,template->car.p->cdr.str,args->car.p,true);
+		} else if(cell_is_list(template->car)
+			&& cell_is_list(args->car))
+			bind_macro_args(env,template->car,args->car);
+		else if(cell_type(template->car) == VAL_SYM)
+			env_set(env,template->car->sym,args->car,true);
 		else check(false,"mal-formed macro arguments");
 	}
 
@@ -108,8 +106,8 @@ cell_t *expand_macro(lambda_t *mac, cell_t *args) {
 	bind_macro_args(macenv,mac->args,args);
 
 	// Expand!
-	for(expr = mac->body, val = NULL; expr; expr = expr->cdr.p)
-		val = eval(macenv,expr->car.p);
+	for(expr = mac->body, val = NULL; expr; expr = expr->cdr)
+		val = eval(macenv,expr->car);
 
 	// Clean up
 	env_free(macenv);
@@ -129,7 +127,7 @@ cell_t *eval(env_t *env, cell_t *sexp) {
 	if(!sexp)
 		return sexp;
 
-	switch(sexp->car.type) {
+	switch(cell_type(sexp)) {
 	case VAL_I64:
 	case VAL_DBL:
 	case VAL_CHR:
@@ -138,26 +136,26 @@ cell_t *eval(env_t *env, cell_t *sexp) {
 		return sexp;
 
 	case VAL_SYM:
-		return env_get(env,sexp->cdr.str,&sexp) ? sexp : NULL;
+		return env_get(env,sexp->sym,&sexp) ? sexp : NULL;
 
 	case VAL_NIL:
 	default:
 		assert(cell_is_list(sexp));
 
-		op = eval(env,sexp->car.p);
-		check(op && (op->car.type == VAL_FCN
-			|| op->car.type == VAL_LBA),
+		op = eval(env,sexp->car);
+		check(op && (cell_type(op) == VAL_FCN
+			|| cell_type(op) == VAL_LBA),
 			"operator must be a function");
-		if(op->car.type == VAL_FCN)
-			return op->cdr.fcn(env,sexp->cdr.p);
-		else if(op->car.type == VAL_LBA) {
-			return op->cdr.lba->ismacro
-				? eval_macro(env,op->cdr.lba,sexp->cdr.p)
-				: eval_lambda(env,op->cdr.lba,sexp->cdr.p);
+		if(cell_type(op) == VAL_FCN)
+			return op->fcn(env,sexp->cdr);
+		else if(cell_type(op) == VAL_LBA) {
+			return cell_lba(op)->ismacro
+				? eval_macro(env,cell_lba(op),sexp->cdr)
+				: eval_lambda(env,cell_lba(op),sexp->cdr);
 		}
 	}
 
-	error("unhandled s-expression of type %i",sexp->car.type);
+	error("unhandled s-expression of type %i",cell_type(sexp));
 
 	return NULL;
 }
@@ -168,15 +166,15 @@ void print(cell_t *sexp) {
 		return;
 	}
 
-	switch(sexp->car.type) {
-	case VAL_SYM: printf("%s",sexp->cdr.str);     break;
-	case VAL_I64: printf("%lli",sexp->cdr.i64);   break;
-	case VAL_DBL: printf("%f",sexp->cdr.dbl);     break;
-	case VAL_CHR: printf("'%c'",sexp->cdr.chr);   break;
-	case VAL_STR: printf("\"%s\"",sexp->cdr.str); break;
-	case VAL_FCN: printf("<%p>",sexp->cdr.dbl);   break;
-	case VAL_LBA: printf("<%s>",sexp->cdr.lba->ismacro
-		? "macro" : "lambda"); break;
+	switch(cell_type(sexp)) {
+	case VAL_SYM: printf("%s",sexp->sym);                        break;
+	case VAL_I64: printf("%lli",sexp->i64);                      break;
+	case VAL_DBL: printf("%f",sexp->dbl);                        break;
+	case VAL_CHR: printf("'%c'",sexp->chr);                      break;
+	case VAL_STR: printf("\"%.*s\"",(int) sexp->i64,sexp->data); break;
+	case VAL_FCN: printf("<%p>",sexp->dbl);                      break;
+	case VAL_LBA: printf("<%s>",cell_lba(sexp)->ismacro
+		? "macro" : "lambda");                               break;
 
 	case VAL_NIL:
 	default:
@@ -185,15 +183,15 @@ void print(cell_t *sexp) {
 		putchar('(');
 		do {
 			if(cell_is_list(sexp)) {
-				print(sexp->car.p);
-				if(sexp->cdr.p)
+				print(sexp->car);
+				if(sexp->cdr)
 					putchar(' ');
 			} else {
 				printf(". ");
 				print(sexp);
 				break;
 			}
-		} while(sexp = sexp->cdr.p);
+		} while(sexp = sexp->cdr);
 		putchar(')');
 		break;
 	}

@@ -1,5 +1,7 @@
 %include {
 #include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "cell.h"
 #include "token.h"
@@ -7,7 +9,7 @@
 
 static cell_t *wrap(char *first, cell_t *cell) {
 	return cell_cons(
-		cell_cons_t(VAL_SYM,cell_str_intern(first)),
+		cell_cons_t(VAL_SYM,cell_str_intern(first,strlen(first))),
 		cell_cons(cell,NULL)
 	);
 }
@@ -36,8 +38,8 @@ s_exp(R) ::= LPAREN s_exp_list(CAR) PERIOD s_exp(CDR) RPAREN. {
 
 		R = CAR ? CAR : cell_cons(NULL,NULL);
 
-		for(tail = R; tail->cdr.p; tail = tail->cdr.p);
-		tail->cdr.p = CDR;
+		for(tail = R; tail->cdr; tail = tail->cdr);
+		tail->cdr = CDR;
 	}
 s_exp(R) ::= QUOTE s_exp(S). { R = wrap("quote",S); }
 s_exp(R) ::= BQUOTE s_exp(S). { R = wrap("quasiquote",S); }
@@ -50,6 +52,12 @@ s_exp_list(R) ::= s_exp(S) s_exp_list(L). { R = cell_cons(S,L); }
 atom(A) ::= INTEGER(I).   { A = cell_cons_t(VAL_I64,I.i64); }
 atom(A) ::= REAL(R).      { A = cell_cons_t(VAL_DBL,R.dbl); }
 atom(A) ::= CHARACTER(C). { A = cell_cons_t(VAL_CHR,C.chr); }
-atom(A) ::= STRING(S).    { A = cell_cons_t(VAL_STR,S.str); }
-atom(A) ::= SYMBOL(S).    { A = cell_cons_t(VAL_SYM,cell_str_intern(S.str)); }
+atom(A) ::= STRING(S).    {
+		A = cell_cons_t(VAL_STR,S.str,S.len);
+		free(S.str);
+	}
+atom(A) ::= SYMBOL(S).    {
+		A = cell_cons_t(VAL_SYM,cell_str_intern(S.str,S.len));
+		free(S.str);
+	}
 

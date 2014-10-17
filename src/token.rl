@@ -46,6 +46,7 @@ stream_t *stream_cons_f(FILE *f) {
 	s->interactive = isatty(fileno(f));
 	s->buflen = 10;
 	s->buf = malloc(s->buflen + 1);
+	assert(s->buf);
 	s->eof = NULL;
 	s->p = s->pe = s->buf;
 	s->tokinited = false;
@@ -83,6 +84,7 @@ static void fill(stream_t *s) {
 	if(s->pe - s->buf + 1 > s->buflen) {
 		s->buflen++;
 		newbuf = realloc(s->buf,s->buflen + 1);
+		assert(newbuf);
 		s->p   = newbuf + (s->p  - s->buf);
 		s->pe  = newbuf + (s->pe - s->buf);
 		s->te  = newbuf + (s->te - s->buf);
@@ -231,15 +233,16 @@ refill:
 			};
 
 			'"' ([^"\\] | EC)* '"' => {
-				val->str = strndup(s->ts + 1,
-					s->te - s->ts - 2);
+				val->str = memdup(s->ts + 1,
+					val->len = s->te - s->ts - 2);
 				ret = STRING;
 				fbreak;
 			};
 
 			[a-zA-Z$_][a-zA-Z0-9$_\-]* |
 			[=+\-]                  => {
-				val->str = strndup(s->ts,s->te - s->ts);
+				val->str = memdup(s->ts,
+					val->len = s->te - s->ts);
 				ret = SYMBOL;
 				fbreak;
 			};

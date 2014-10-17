@@ -7,11 +7,14 @@
 typedef struct stream stream_t;
 
 typedef union token_value {
-	int64_t i64;
-	double dbl;
-
 	char chr;
-	char *str;
+	double dbl;
+	int64_t i64;
+
+	struct {
+		char *str;
+		int64_t len;
+	};
 } token_value_t;
 
 

@@ -167,20 +167,6 @@ static cell_t *lambda(env_t *env, cell_t *args) {
 	return cell_cons_t(VAL_LBA,&lamb);
 }
 
-static cell_t *list(env_t *env, cell_t *args) {
-	cell_t *head, **tail;
-
-	head = NULL;
-	tail = &head;
-
-	for(; args; args = args->cdr) {
-		*tail = cell_cons(eval(env,args->car),NULL);
-		tail = &(*tail)->cdr;
-	}
-
-	return head;
-}
-
 static cell_t *macro(env_t *env, cell_t *args) {
 	lambda_t mac;
 
@@ -457,7 +443,6 @@ void builtin_init(env_t *env) {
 		{"eval",         eval_builtin},
 		{"gensym",       gensym},
 		{"lambda",       lambda},
-		{"list",         list},
 		{"macro",        macro},
 		{"macroexpand",  macroexpand},
 		{"macroexpand-1",macroexpand_1},

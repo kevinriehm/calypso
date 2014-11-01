@@ -29,3 +29,7 @@
 (defmacro cdddar (x) `(cdr (cdr (cdr (car ,x)))))
 (defmacro cddddr (x) `(cdr (cdr (cdr (cdr ,x)))))
 
+(defmacro list (. args)
+    (cond ((eq args nil) 'nil)
+          ('t            `(cons ',(eval (car args)) (list ,@(cdr args))))))
+

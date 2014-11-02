@@ -153,11 +153,6 @@ static cell_t *lambda(env_t *env, cell_t *args) {
 
 	check(args,"missing lambda parameter list");
 
-	// Check the argument list
-	for(arg = args->car; arg; arg = arg->cdr)
-		check(cell_type(arg->car) == VAL_SYM,
-			"invalid symbol name in lambda parameter list");
-
 	// Set up the lambda
 	lamb.ismacro = false;
 	lamb.env = env_ref(env);
@@ -197,7 +192,7 @@ static cell_t *macroexpand(env_t *env, cell_t *args) {
 		if(!op || cell_type(op) != VAL_LBA || !cell_lba(op)->ismacro)
 			return expr;
 
-		expr = expand_macro(cell_lba(op),expr->cdr);
+		expr = eval_lambda(NULL,cell_lba(op),expr->cdr);
 	}
 
 	return expr;
@@ -218,7 +213,7 @@ static cell_t *macroexpand_1(env_t *env, cell_t *args) {
 	if(!op || cell_type(op) != VAL_LBA || !cell_lba(op)->ismacro)
 		return expr;
 
-	return expand_macro(cell_lba(op),expr->cdr);
+	return eval_lambda(NULL,cell_lba(op),expr->cdr);
 }
 
 static void print_cell(cell_t *args) {

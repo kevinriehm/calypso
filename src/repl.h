@@ -14,7 +14,7 @@ extern jmp_buf checkjmp;
 
 void run_file(struct env *, FILE *);
 
-struct cell *expand_macro(struct lambda *, struct cell *);
+struct cell *eval_lambda(struct env *, struct lambda *, struct cell *);
 struct cell *eval(struct env *, struct cell *);
 
 #endif

@@ -51,29 +51,9 @@ bool readf(void *p, stream_t *s, cell_t **cell) {
 	return *cell != &sentinel;
 }
 
-static cell_t *eval_lambda(env_t *env, lambda_t *lamb, cell_t *args) {
-	env_t *lambenv;
-	cell_t *lambarg, *lambexpr, *val;
+static void bind_args(env_t *env, cell_t *template, cell_t *args, bool macro) {
+	cell_t *head, **tail;
 
-	lambenv = env_cons(lamb->env);
-
-	// Bind the arguments
-	for(lambarg = lamb->args; args && lambarg;
-		args = args->cdr, lambarg = lambarg->cdr)
-		env_set(lambenv,lambarg->car->sym,eval(env,args->car),true);
-	check(!lambarg,"too few arguments to lambda expression");
-
-	// Evaluate the expressions
-	val = NULL;
-	for(lambexpr = lamb->body; lambexpr; lambexpr = lambexpr->cdr)
-		val = eval(lambenv,lambexpr->car);
-
-	env_free(lambenv);
-
-	return val;
-}
-
-static void bind_macro_args(env_t *env, cell_t *template, cell_t *args) {
 	for(; args && template; args = args->cdr, template = template->cdr) {
 		// Skip nil in the template
 		while(!template->car) {
@@ -83,13 +63,19 @@ static void bind_macro_args(env_t *env, cell_t *template, cell_t *args) {
 		}
 
 		if(cell_type(template) == VAL_SYM) { // Var-args
-			env_set(env,template->sym,args,true);
+			// Evaluate the args for normal lambdas
+			for(head = NULL, tail = &head; !macro && args;
+				args = args->cdr, tail = &(*tail)->cdr)
+				*tail = cell_cons(eval(env,args->car),NULL);
+
+			env_set(env,template->sym,macro ? args : head,true);
 			break;
 		} else if(cell_is_list(template->car)
 			&& cell_is_list(args->car))
-			bind_macro_args(env,template->car,args->car);
+			bind_args(env,template->car,args->car,macro);
 		else if(cell_type(template->car) == VAL_SYM)
-			env_set(env,template->car->sym,args->car,true);
+			env_set(env,template->car->sym,
+				macro ? args->car : eval(env,args->car),true);
 		else check(false,"mal-formed macro arguments");
 	}
 
@@ -97,26 +83,27 @@ static void bind_macro_args(env_t *env, cell_t *template, cell_t *args) {
 		"too few arguments to macro expression");
 }
 
-cell_t *expand_macro(lambda_t *mac, cell_t *args) {
-	env_t *macenv;
-	cell_t *expr, *op, *val;
+cell_t *eval_lambda(env_t *env, lambda_t *lamb, cell_t *args) {
+	env_t *lambenv;
+	cell_t *lambarg, *lambexpr, *val;
 
-	// Set up the environment
-	macenv = env_cons(mac->env);
-	bind_macro_args(macenv,mac->args,args);
+	lambenv = env_cons(lamb->env);
 
-	// Expand!
-	for(expr = mac->body, val = NULL; expr; expr = expr->cdr)
-		val = eval(macenv,expr->car);
+	// Bind the arguments
+	bind_args(lambenv,lamb->args,args,lamb->ismacro);
 
-	// Clean up
-	env_free(macenv);
+	// Evaluate the body
+	val = NULL;
+	for(lambexpr = lamb->body; lambexpr; lambexpr = lambexpr->cdr)
+		val = eval(lambenv,lambexpr->car);
+
+	env_free(lambenv);
 
 	return val;
 }
 
 static cell_t *eval_macro(env_t *env, lambda_t *mac, cell_t *args) {
-	return eval(env,expand_macro(mac,args));
+	return eval(env,eval_lambda(env,mac,args));
 }
 
 cell_t *eval(env_t *env, cell_t *sexp) {
@@ -149,9 +136,8 @@ cell_t *eval(env_t *env, cell_t *sexp) {
 		if(cell_type(op) == VAL_FCN)
 			return op->fcn(env,sexp->cdr);
 		else if(cell_type(op) == VAL_LBA) {
-			return cell_lba(op)->ismacro
-				? eval_macro(env,cell_lba(op),sexp->cdr)
-				: eval_lambda(env,cell_lba(op),sexp->cdr);
+			sexp = eval_lambda(env,cell_lba(op),sexp->cdr);
+			return cell_lba(op)->ismacro ? eval(env,sexp) : sexp;
 		}
 	}
 

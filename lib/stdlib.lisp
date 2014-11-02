@@ -1,4 +1,5 @@
 (= defmacro (macro (name (. args) . body) `(= ,name (macro ,args ,@body))))
+(= defun (macro (name (. args) . body) `(= ,name (lambda ,args ,@body))))
 
 (defmacro caar   (x) `(car (car ,x)))
 (defmacro cadr   (x) `(car (cdr ,x)))
@@ -29,7 +30,7 @@
 (defmacro cdddar (x) `(cdr (cdr (cdr (car ,x)))))
 (defmacro cddddr (x) `(cdr (cdr (cdr (cdr ,x)))))
 
-(defmacro list (. args)
-    (cond ((eq args nil) 'nil)
-          ('t            `(cons ',(eval (car args)) (list ,@(cdr args))))))
+(defmacro null (x) `(eq nil ,x))
+
+(defun list (. args) args)
 

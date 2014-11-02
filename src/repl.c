@@ -51,7 +51,8 @@ bool readf(void *p, stream_t *s, cell_t **cell) {
 	return *cell != &sentinel;
 }
 
-static void bind_args(env_t *env, cell_t *template, cell_t *args, bool macro) {
+static void bind_args(env_t *env, env_t *envout, cell_t *template,
+	cell_t *args, bool macro) {
 	cell_t *head, **tail;
 
 	for(; args && template; args = args->cdr, template = template->cdr) {
@@ -68,13 +69,13 @@ static void bind_args(env_t *env, cell_t *template, cell_t *args, bool macro) {
 				args = args->cdr, tail = &(*tail)->cdr)
 				*tail = cell_cons(eval(env,args->car),NULL);
 
-			env_set(env,template->sym,macro ? args : head,true);
+			env_set(envout,template->sym,macro ? args : head,true);
 			break;
 		} else if(cell_is_list(template->car)
 			&& cell_is_list(args->car))
-			bind_args(env,template->car,args->car,macro);
+			bind_args(env,envout,template->car,args->car,macro);
 		else if(cell_type(template->car) == VAL_SYM)
-			env_set(env,template->car->sym,
+			env_set(envout,template->car->sym,
 				macro ? args->car : eval(env,args->car),true);
 		else check(false,"mal-formed macro arguments");
 	}
@@ -90,7 +91,7 @@ cell_t *eval_lambda(env_t *env, lambda_t *lamb, cell_t *args) {
 	lambenv = env_cons(lamb->env);
 
 	// Bind the arguments
-	bind_args(lambenv,lamb->args,args,lamb->ismacro);
+	bind_args(env,lambenv,lamb->args,args,lamb->ismacro);
 
 	// Evaluate the body
 	val = NULL;

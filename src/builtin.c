@@ -122,6 +122,9 @@ static cell_t *eq(env_t *env, cell_t *args) {
 		return memcmp(cell_lba(a),cell_lba(b),sizeof(lambda_t)) == 0
 			? sym_t : NULL;
 
+	case VAL_LST:
+		return NULL;
+
 	default:
 		error("unhandled value in eq, type %i",cell_type(a));
 		return NULL;

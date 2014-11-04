@@ -434,12 +434,11 @@ eval_lambda:
 	BIND_ARGS(env,lambenv,lambp->args,args,lambp->ismacro);
 
 	// Evaluate the body
-	for(body = lambp->body; body; body = body->cdr)
+	for(body = lambp->body; body && body->cdr; body = body->cdr)
 		EVAL(lambenv,body->car);
 
-	env_free(lambenv);
-
-	RETURN(retval);
+	// Jump right to the last body expression
+	JMP_EVAL(lambenv,body->car);
 
 append:
 #undef PRESERVE

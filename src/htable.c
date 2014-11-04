@@ -118,13 +118,17 @@ htable_t *htable_cons(uint32_t mincap) {
 }
 
 void htable_free(htable_t *tab) {
-	hentry_t *entry;
+	hentry_t *entry, *prev;
 
 	// Free our copies of the keys
 	for(int i = 0; i < tab->cap; i++) {
-		for(entry = tab->entries[i]; entry; entry = entry->next) {
-			free(entry->key);
-			free(entry);
+		entry = tab->entries[i];
+		while(entry) {
+			prev = entry;
+			entry = entry->next;
+
+			free(prev->key);
+			free(prev);
 		}
 	}
 
@@ -149,8 +153,7 @@ void htable_insert(htable_t *tab, void *key, size_t keylen, hvalue_t val) {
 
 	// key isn't in tab (yet)
 	entry = malloc(sizeof *entry);
-	entry->key = memdup(key,keylen + 1);
-	((char *) entry->key)[keylen] = '\0';
+	entry->key = memdup(key,keylen);
 	entry->keylen = keylen;
 	entry->val = val;
 	entry->next = tab->entries[index];

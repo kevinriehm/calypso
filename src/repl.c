@@ -222,6 +222,11 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 	EXPAND(LOAD(PRESERVE)); \
 } while(0)
 
+#define JMP(fcn, ...) do { \
+	EXPAND(SET(__VA_ARGS__)); \
+	goto fcn; \
+} while(0)
+
 #define RETURN(_val) do { \
 	retval = (_val); \
 \
@@ -233,49 +238,53 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 
 #define EVAL(_env, _sexp) \
 	CALL(eval,env,(_env),sexp,(_sexp))
+#define JMP_EVAL(_env, _sexp) \
+	JMP(eval,env,(_env),sexp,(_sexp))
 #define BIND_ARGS(_env, _envout, _template, _args, _ismacro) \
 	CALL(bind_args,env,(_env),envout,(_envout),template,(_template), \
 		args,(_args),ismacro,(_ismacro))
 #define EVAL_LAMBDA(_env, _lambp, _args) \
 	CALL(eval_lambda,env,(_env),lambp,(_lambp),args,(_args))
-#define APPEND(_env, _args) \
-	CALL(append,env,(_env),args,(_args))
-#define ATOM(_env, _args) \
-	CALL(atom,env,(_env),args,(_args))
-#define CAR(_env, _args) \
-	CALL(car,env,(_env),args,(_args))
-#define CDR(_env, _args) \
-	CALL(cdr,env,(_env),args,(_args))
-#define COND(_env, _args) \
-	CALL(cond,env,(_env),args,(_args))
-#define CONS(_env, _args) \
-	CALL(cons,env,(_env),args,(_args))
-#define EQ(_env, _args) \
-	CALL(eq,env,(_env),args,(_args))
-#define GENSYM(_env, _args) \
-	CALL(gensym,env,(_env),args,(_args))
-#define LAMBDA(_env, _args) \
-	CALL(lambda,env,(_env),args,(_args))
-#define MACRO(_env, _args) \
-	CALL(macro,env,(_env),args,(_args))
-#define MACROEXPAND(_env, _args) \
-	CALL(macroexpand,env,(_env),args,(_args))
-#define MACROEXPAND_1(_env, _args) \
-	CALL(macroexpand_1,env,(_env),args,(_args))
-#define PRINT(_env, _args) \
-	CALL(print,env,(_env),args,(_args))
-#define QUASIQUOTE(_env, _args) \
-	CALL(quasiquote,env,(_env),args,(_args))
+#define JMP_EVAL_LAMBDA(_env, _lambp, _args) \
+	JMP(eval_lambda,env,(_env),lambp,(_lambp),args,(_args))
+#define JMP_APPEND(_env, _args) \
+	JMP(append,env,(_env),args,(_args))
+#define JMP_ATOM(_env, _args) \
+	JMP(atom,env,(_env),args,(_args))
+#define JMP_CAR(_env, _args) \
+	JMP(car,env,(_env),args,(_args))
+#define JMP_CDR(_env, _args) \
+	JMP(cdr,env,(_env),args,(_args))
+#define JMP_COND(_env, _args) \
+	JMP(cond,env,(_env),args,(_args))
+#define JMP_CONS(_env, _args) \
+	JMP(cons,env,(_env),args,(_args))
+#define JMP_EQ(_env, _args) \
+	JMP(eq,env,(_env),args,(_args))
+#define JMP_GENSYM(_env, _args) \
+	JMP(gensym,env,(_env),args,(_args))
+#define JMP_LAMBDA(_env, _args) \
+	JMP(lambda,env,(_env),args,(_args))
+#define JMP_MACRO(_env, _args) \
+	JMP(macro,env,(_env),args,(_args))
+#define JMP_MACROEXPAND(_env, _args) \
+	JMP(macroexpand,env,(_env),args,(_args))
+#define JMP_MACROEXPAND_1(_env, _args) \
+	JMP(macroexpand_1,env,(_env),args,(_args))
+#define JMP_PRINT(_env, _args) \
+	JMP(print,env,(_env),args,(_args))
+#define JMP_QUASIQUOTE(_env, _args) \
+	JMP(quasiquote,env,(_env),args,(_args))
 #define QUASIQUOTE_UNQUOTE(_env, _sexp, _splicep) \
 	CALL(quasiquote_unquote,env,(_env),sexp,(_sexp),splicep,(_splicep))
-#define QUOTE(_env, _args) \
-	CALL(quote,env,(_env),args,(_args))
-#define ASSIGN(_env, _args) \
-	CALL(assign,env,(_env),args,(_args))
-#define ADD(_env, _args) \
-	CALL(add,env,(_env),args,(_args))
-#define SUB(_env, _args) \
-	CALL(sub,env,(_env),args,(_args))
+#define JMP_QUOTE(_env, _args) \
+	JMP(quote,env,(_env),args,(_args))
+#define JMP_ASSIGN(_env, _args) \
+	JMP(assign,env,(_env),args,(_args))
+#define JMP_ADD(_env, _args) \
+	JMP(add,env,(_env),args,(_args))
+#define JMP_SUB(_env, _args) \
+	JMP(sub,env,(_env),args,(_args))
 
 cell_t *eval(env_t *volatile env, cell_t *volatile sexp) {
 	static int gensym_counter = 0;
@@ -340,32 +349,35 @@ eval:
 		if(cell_type(op) == VAL_FCN) {
 			sexp = sexp->cdr;
 			switch(op->fcn) {
-			case FCN_APPEND:        APPEND(env,sexp);        break;
-			case FCN_ATOM:          ATOM(env,sexp);          break;
-			case FCN_CAR:           CAR(env,sexp);           break;
-			case FCN_CDR:           CDR(env,sexp);           break;
-			case FCN_COND:          COND(env,sexp);          break;
-			case FCN_CONS:          CONS(env,sexp);          break;
-			case FCN_EQ:            EQ(env,sexp);            break;
-			case FCN_EVAL:          EVAL(env,sexp);          break;
-			case FCN_GENSYM:        GENSYM(env,sexp);        break;
-			case FCN_LAMBDA:        LAMBDA(env,sexp);        break;
-			case FCN_MACRO:         MACRO(env,sexp);         break;
-			case FCN_MACROEXPAND:   MACROEXPAND(env,sexp);   break;
-			case FCN_MACROEXPAND_1: MACROEXPAND_1(env,sexp); break;
-			case FCN_PRINT:         PRINT(env,sexp);         break;
-			case FCN_QUASIQUOTE:    QUASIQUOTE(env,sexp);    break;
-			case FCN_QUOTE:         QUOTE(env,sexp);         break;
-			case FCN_ASSIGN:        ASSIGN(env,sexp);        break;
-			case FCN_ADD:           ADD(env,sexp);           break;
-			case FCN_SUB:           SUB(env,sexp);           break;
+			case FCN_APPEND:     JMP_APPEND(env,sexp);     break;
+			case FCN_ATOM:       JMP_ATOM(env,sexp);       break;
+			case FCN_CAR:        JMP_CAR(env,sexp);        break;
+			case FCN_CDR:        JMP_CDR(env,sexp);        break;
+			case FCN_COND:       JMP_COND(env,sexp);       break;
+			case FCN_CONS:       JMP_CONS(env,sexp);       break;
+			case FCN_EQ:         JMP_EQ(env,sexp);         break;
+			case FCN_EVAL:       JMP_EVAL(env,sexp);       break;
+			case FCN_GENSYM:     JMP_GENSYM(env,sexp);     break;
+			case FCN_LAMBDA:     JMP_LAMBDA(env,sexp);     break;
+			case FCN_MACRO:      JMP_MACRO(env,sexp);      break;
+			case FCN_MACROEXPAND:
+				JMP_MACROEXPAND(env,sexp);             break;
+			case FCN_MACROEXPAND_1:
+				JMP_MACROEXPAND_1(env,sexp);           break;
+			case FCN_PRINT:      JMP_PRINT(env,sexp);      break;
+			case FCN_QUASIQUOTE: JMP_QUASIQUOTE(env,sexp); break;
+			case FCN_QUOTE:      JMP_QUOTE(env,sexp);      break;
+			case FCN_ASSIGN:     JMP_ASSIGN(env,sexp);     break;
+			case FCN_ADD:        JMP_ADD(env,sexp);        break;
+			case FCN_SUB:        JMP_SUB(env,sexp);        break;
 			}
-			RETURN(retval);
+
+			check(false,"unhandled function type");
 		} else if(cell_type(op) == VAL_LBA) {
-			EVAL_LAMBDA(env,cell_lba(op),sexp->cdr);
-			if(cell_lba(op)->ismacro)
-				EVAL(env,retval);
-			RETURN(retval);
+			if(cell_lba(op)->ismacro) {
+				EVAL_LAMBDA(env,cell_lba(op),sexp->cdr);
+				JMP_EVAL(env,retval);
+			} else JMP_EVAL_LAMBDA(env,cell_lba(op),sexp->cdr);
 		}
 	}
 
@@ -484,10 +496,8 @@ cond:
 			"argument to cond must be a pair");
 
 		EVAL(env,pair->car);
-		if(retval) {
-			EVAL(env,pair->cdr->car);
-			RETURN(retval);
-		}
+		if(retval)
+			JMP_EVAL(env,pair->cdr->car);
 	}
 
 	RETURN(NULL);
@@ -624,8 +634,7 @@ macroexpand_1:
 	if(!op || cell_type(op) != VAL_LBA || !cell_lba(op)->ismacro)
 		RETURN(sexp);
 
-	EVAL_LAMBDA(NULL,cell_lba(op),sexp->cdr);
-	RETURN(retval);
+	JMP_EVAL_LAMBDA(NULL,cell_lba(op),sexp->cdr);
 
 print:
 #undef PRESERVE
@@ -665,8 +674,7 @@ quasiquote_unquote:
 		check(sexp,"too few arguments to unquote");
 		check(!sexp->cdr,"too many arguments to unquote");
 
-		EVAL(env,sexp->car);
-		RETURN(retval);
+		JMP_EVAL(env,sexp->car);
 	}
 
 	// ,@sexp
@@ -680,8 +688,7 @@ quasiquote_unquote:
 
 		*splicep = true;
 
-		EVAL(env,sexp->car);
-		RETURN(retval);
+		JMP_EVAL(env,sexp->car);
 	}
 
 	// (... ,sexp ... ,@sexp ...)

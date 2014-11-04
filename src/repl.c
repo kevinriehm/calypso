@@ -120,22 +120,20 @@ void grow_stack(stack_t *stack, size_t nbytes) {
 	char *newstack;
 	size_t newsize;
 
-	if(stack->top - stack->bottom + nbytes > stack->size) {
-		newsize = STACK_GROWTH*stack->size;
-		if(newsize < stack->size + nbytes)
-			newsize = stack->size + nbytes;
-		if(newsize > STACK_MAX_SIZE)
-			newsize = STACK_MAX_SIZE;
-		check(newsize >= stack->size + nbytes,"stack overflow");
+	newsize = STACK_GROWTH*stack->size;
+	if(newsize < stack->size + nbytes)
+		newsize = stack->size + nbytes;
+	if(newsize > STACK_MAX_SIZE)
+		newsize = STACK_MAX_SIZE;
+	check(newsize >= stack->size + nbytes,"stack overflow");
 fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
-		newstack = realloc(stack->bottom,
-			newsize*sizeof *stack->bottom);
-		check(newstack,"cannot grow stack");
+	newstack = realloc(stack->bottom,
+		newsize*sizeof *stack->bottom);
+	check(newstack,"cannot grow stack");
 
-		stack->size = newsize;
-		stack->top = newstack + (stack->top - stack->bottom);
-		stack->bottom = newstack;
-	}
+	stack->size = newsize;
+	stack->top = newstack + (stack->top - stack->bottom);
+	stack->bottom = newstack;
 }
 
 #define EXPAND(...) __VA_ARGS__
@@ -158,8 +156,13 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 #define VAR_ARG_(base, num, ...) VAR_ARG__(base,num,__VA_ARGS__)
 #define VAR_ARG__(base, num, ...) base##num (__VA_ARGS__)
 
+#define STACK_ENSURE_SPACE(nbytes) ( \
+	stack.top + (nbytes) - stack.bottom > stack.size \
+		? grow_stack(&stack,(nbytes)) : (void) 0 \
+)
+
 #define STACK_ALLOC(type) ( \
-	grow_stack(&stack,sizeof(type)), \
+	STACK_ENSURE_SPACE(sizeof(type)), \
 	stack.top += sizeof(type), \
 	STACK_TOP(type) \
 )
@@ -169,7 +172,7 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 #define STACK_TOP(type) (*(type *) (stack.top - sizeof(type)))
 
 #define PUSH(var) do { \
-	grow_stack(&stack,sizeof (var)); \
+	STACK_ENSURE_SPACE(sizeof (var)); \
 	memcpy(stack.top,(void *) &(var),sizeof (var)); \
 	stack.top += sizeof (var); \
 } while(0)

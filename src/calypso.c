@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "builtin.h"
 #include "cell.h"
 #include "env.h"
 #include "repl.h"

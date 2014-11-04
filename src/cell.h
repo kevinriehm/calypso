@@ -21,6 +21,30 @@ typedef enum cell_type {
 	VAL_LST
 } cell_type_t;
 
+typedef enum fcn {
+	FCN_APPEND,
+	FCN_ATOM,
+	FCN_CAR,
+	FCN_CDR,
+	FCN_COND,
+	FCN_CONS,
+	FCN_EQ,
+	FCN_EVAL,
+	FCN_GENSYM,
+	FCN_LAMBDA,
+	FCN_MACRO,
+	FCN_MACROEXPAND,
+	FCN_MACROEXPAND_1,
+	FCN_PRINT,
+	FCN_QUASIQUOTE,
+	FCN_QUOTE,
+
+	FCN_ASSIGN,
+
+	FCN_ADD,
+	FCN_SUB
+} fcn_t;
+
 typedef struct lambda {
 	bool ismacro;
 	struct env *env;
@@ -40,7 +64,7 @@ typedef struct cell {
 
 		char *sym;
 
-		struct cell *(*fcn)(struct env *, struct cell *);
+		fcn_t fcn;
 	};
 
 	char data[];

@@ -203,17 +203,17 @@ refill:
 			[ \t];
 			'\n' => { lineno++; };
 
-			'(' => { ret = LPAREN; fbreak; };
-			')' => { ret = RPAREN; fbreak; };
-			'\'' => { ret = QUOTE; fbreak; };
-			'.' => { ret = PERIOD; fbreak; };
-			'`' => { ret = BQUOTE; fbreak; };
-			',' => { ret = COMMA;  fbreak; };
-			'@' => { ret = AT;     fbreak; };
+			'(' => { ret = TOK_LPAREN; fbreak; };
+			')' => { ret = TOK_RPAREN; fbreak; };
+			'\'' => { ret = TOK_QUOTE; fbreak; };
+			'.' => { ret = TOK_PERIOD; fbreak; };
+			'`' => { ret = TOK_BQUOTE; fbreak; };
+			',' => { ret = TOK_COMMA;  fbreak; };
+			'@' => { ret = TOK_AT;     fbreak; };
 
 			S I | S H | S O => {
 				val->i64 = strtoll(s->ts,NULL,0);
-				ret = INTEGER;
+				ret = TOK_INTEGER;
 				fbreak;
 			};
 
@@ -222,20 +222,20 @@ refill:
 			S 'inf'       |
 			S 'nan'    => {
 				val->dbl = strtod(s->ts,NULL);
-				ret = REAL;
+				ret = TOK_REAL;
 				fbreak;
 			};
 
 			'\'' ([^'\\] | EC) '\'' => {
 				val->chr = s->ts[1];
-				ret = CHARACTER;
+				ret = TOK_CHARACTER;
 				fbreak;
 			};
 
 			'"' ([^"\\] | EC)* '"' => {
 				val->str = memdup(s->ts + 1,
 					val->len = s->te - s->ts - 2);
-				ret = STRING;
+				ret = TOK_STRING;
 				fbreak;
 			};
 
@@ -243,7 +243,7 @@ refill:
 			[=+\-]                  => {
 				val->str = memdup(s->ts,
 					val->len = s->te - s->ts);
-				ret = SYMBOL;
+				ret = TOK_SYMBOL;
 				fbreak;
 			};
 		*|;

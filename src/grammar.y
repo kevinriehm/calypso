@@ -17,6 +17,8 @@ static cell_t *wrap(char *first, cell_t *cell) {
 
 %extra_argument { cell_t **root }
 
+%token_prefix TOK_
+
 %token_type { token_value_t }
 
 %type s_exp         { cell_t * }

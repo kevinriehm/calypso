@@ -45,11 +45,7 @@ cell_t *cell_cons_t(cell_type_t type, ...) {
 		case VAL_I64: cell->i64 = va_arg(ap,int64_t); break;
 		case VAL_DBL: cell->dbl = va_arg(ap,double);  break;
 		case VAL_CHR: cell->chr = va_arg(ap,int);     break;
-
-		case VAL_FCN:
-			cell->fcn = va_arg(ap,
-				cell_t *(*)(env_t *, cell_t *));
-			break;
+		case VAL_FCN: cell->fcn = va_arg(ap,fcn_t);   break;
 
 		default: die("unhandled cell type (%i)",type);
 		}

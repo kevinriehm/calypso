@@ -12,9 +12,10 @@ extern int lineno;
 extern char *filename;
 extern jmp_buf checkjmp;
 
+void builtin_init(struct env *);
+
 void run_file(struct env *, FILE *);
 
-struct cell *eval_lambda(struct env *, struct lambda *, struct cell *);
 struct cell *eval(struct env *, struct cell *);
 
 #endif

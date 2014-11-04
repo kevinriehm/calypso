@@ -1,4 +1,4 @@
-LYP_CSRC := calypso.c builtin.c cell.c env.c htable.c rbtree.c repl.c util.c
+LYP_CSRC := calypso.c builtin.c cell.c env.c htable.c repl.c util.c
 LYP_RSRC := token.c.re
 LYP_YSRC := grammar.y
 

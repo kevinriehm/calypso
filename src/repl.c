@@ -576,7 +576,7 @@ lambda:
 
 	// Set up the lambda
 	lamb.ismacro = false;
-	lamb.env = env_ref(env);
+	lamb.env = env;
 	lamb.args = args->car;
 	lamb.body = args->cdr;
 
@@ -589,7 +589,7 @@ macro:
 
 	// Set up the macro
 	lamb.ismacro = true;
-	lamb.env = env_ref(env);
+	lamb.env = env;
 	lamb.args = args->car;
 	lamb.body = args->cdr;
 

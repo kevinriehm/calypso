@@ -8,8 +8,6 @@
 #include "htable.h"
 
 struct env {
-	uint32_t ref;
-
 	struct env *parent;
 
 	htable_t *tab;
@@ -18,30 +16,21 @@ struct env {
 env_t *env_cons(env_t *parent) {
 	env_t *env;
 
-	env = malloc(sizeof *env);
+	env = malloc(sizeof *env); // TODO: GC this
 	assert(env);
-	env->ref = 1;
 	env->parent = parent;
 	env->tab = htable_cons(0);
-
-	assert(!parent || parent->ref++);
 
 	return env;
 }
 
 void env_free(env_t *env) {
-	if(!env || --env->ref)
+	if(!env)
 		return;
 
 	htable_free(env->tab);
 	env_free(env->parent);
 	free(env);
-}
-
-env_t *env_ref(env_t *env) {
-	if(env) env->ref++;
-
-	return env;
 }
 
 env_t *env_parent(env_t *env) {

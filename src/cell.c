@@ -12,7 +12,7 @@
 cell_t *cell_cons(cell_t *car, cell_t *cdr) {
 	cell_t *cell;
 
-	cell = malloc(sizeof *cell);
+	cell = malloc(sizeof *cell); // TODO: GC this
 	cell->car = car;
 	cell->cdr = cdr;
 
@@ -31,14 +31,14 @@ cell_t *cell_cons_t(cell_type_t type, ...) {
 		str = va_arg(ap,char *);
 		len = va_arg(ap,int64_t);
 
-		cell = malloc((sizeof *cell) + len);
+		cell = malloc((sizeof *cell) + len); // TODO: GC this
 		cell->i64 = len;
 		memcpy(cell->data,str,len);
-	} else if(type == VAL_LBA) {
+	} else if(type == VAL_LBA) { // TODO: GC this
 		cell = malloc((sizeof *cell) + sizeof(lambda_t));
 		memcpy(cell->data,va_arg(ap,lambda_t *),sizeof(lambda_t));
 	} else {
-		cell = malloc(sizeof *cell);
+		cell = malloc(sizeof *cell); // TODO: GC this
 		switch(type) {
 		case VAL_NIL: cell->cdr = NULL; break;
 		case VAL_SYM: cell->sym = va_arg(ap,char *);  break;
@@ -69,7 +69,7 @@ cell_t *cell_dup(cell_t *cell) {
 	default: len = sizeof *cell; break;
 	}
 
-	copy = malloc(len);
+	copy = malloc(len); // TODO: GC this
 	memcpy(copy,cell,len);
 
 	return copy;

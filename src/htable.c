@@ -107,7 +107,7 @@ static void htable_resize(htable_t *tab, uint32_t cap) {
 htable_t *htable_cons(uint32_t mincap) {
 	htable_t *tab;
 
-	tab = malloc(sizeof *tab);
+	tab = malloc(sizeof *tab); // TODO: GC this
 
 	tab->cap = 1 << (int) (log2((mincap ? mincap : 0x10) - 1) + 1);
 	tab->mincap = mincap;
@@ -152,7 +152,7 @@ void htable_insert(htable_t *tab, void *key, size_t keylen, hvalue_t val) {
 	}
 
 	// key isn't in tab (yet)
-	entry = malloc(sizeof *entry);
+	entry = malloc(sizeof *entry); // TODO: GC this
 	entry->key = memdup(key,keylen);
 	entry->keylen = keylen;
 	entry->val = val;

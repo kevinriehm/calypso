@@ -32,7 +32,7 @@ void die(char *str, ...) {
 void *memdup(void *p, size_t n) {
 	void *newp;
 
-	newp = malloc(n);
+	newp = malloc(n); // TODO: GC this
 	memcpy(newp,p,n);
 
 	return newp;

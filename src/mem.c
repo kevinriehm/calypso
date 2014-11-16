@@ -67,10 +67,9 @@ static void *small_alloc(arena_t **arenas, size_t size) {
 	    "\n\ttotal size:   %i"
 	    "\n\tchunk size:   %i"
 	    "\n\tchunk count:  %i"
-	    "\n\toverhead:     %i"
-	    "\n\tefficiency:   %.2f%%",
+	    "\n\toverhead:     %i (%.2f%%)",
 		arena,(int) ARENA_SIZE,(int) size,(int) nblocks,
-		(int) blocksoff,100.*(ARENA_SIZE - blocksoff)/ARENA_SIZE);
+		(int) blocksoff,100.*(ARENA_SIZE - nblocks*size)/ARENA_SIZE);
 
 	((struct free_block *) ((char *) arena + blocksoff
 		+ (nblocks - 1)*size))->next = NULL;

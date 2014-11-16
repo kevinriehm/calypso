@@ -62,14 +62,15 @@ static void *small_alloc(arena_t **arenas, size_t size) {
 	blocksoff = (offsetof(arena_t,data) + (nblocks*2 + 7)/8
 		+ alignof(max_align_t) - 1)&~(alignof(max_align_t) - 1);
 
-	debug("new arena:"
+	debug("new small-allocation arena:"
 	    "\n\tbase address: %p"
 	    "\n\ttotal size:   %i"
 	    "\n\tchunk size:   %i"
 	    "\n\tchunk count:  %i"
 	    "\n\toverhead:     %i (%.2f%%)",
 		arena,(int) ARENA_SIZE,(int) size,(int) nblocks,
-		(int) blocksoff,100.*(ARENA_SIZE - nblocks*size)/ARENA_SIZE);
+		(int) (ARENA_SIZE - nblocks*size),
+		100.*(ARENA_SIZE - nblocks*size)/ARENA_SIZE);
 
 	((struct free_block *) ((char *) arena + blocksoff
 		+ (nblocks - 1)*size))->next = NULL;

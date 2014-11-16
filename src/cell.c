@@ -32,11 +32,11 @@ cell_t *cell_cons_t(cell_type_t type, ...) {
 		str = va_arg(ap,char *);
 		len = va_arg(ap,int64_t);
 
-		cell = malloc((sizeof *cell) + len); // TODO: GC this
+		cell = mem_alloc((sizeof *cell) + len);
 		cell->i64 = len;
 		memcpy(cell->data,str,len);
-	} else if(type == VAL_LBA) { // TODO: GC this
-		cell = malloc((sizeof *cell) + sizeof(lambda_t));
+	} else if(type == VAL_LBA) {
+		cell = mem_alloc((sizeof *cell) + sizeof(lambda_t));
 		memcpy(cell->data,va_arg(ap,lambda_t *),sizeof(lambda_t));
 	} else {
 		cell = mem_alloc(sizeof *cell);
@@ -70,7 +70,7 @@ cell_t *cell_dup(cell_t *cell) {
 	default: len = sizeof *cell; break;
 	}
 
-	copy = malloc(len); // TODO: GC this
+	copy = mem_alloc(len);
 	memcpy(copy,cell,len);
 
 	return copy;

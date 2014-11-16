@@ -12,7 +12,6 @@ typedef union hvalue {
 } hvalue_t;
 
 htable_t *htable_cons(uint32_t);
-void htable_free(htable_t *);
 
 void htable_insert(htable_t *, void *, size_t, hvalue_t);
 bool htable_lookup(htable_t *, void *, size_t, hvalue_t *);

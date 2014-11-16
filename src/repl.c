@@ -10,6 +10,7 @@
 #include "check.h"
 #include "env.h"
 #include "grammar.h"
+#include "mem.h"
 #include "repl.h"
 #include "token.h"
 #include "util.h"
@@ -564,7 +565,7 @@ gensym:
 #define PRESERVE
 	check(!args,"too many arguments to gensym");
 
-	str = malloc(1 + 5 + 1); // TODO: GC this
+	str = mem_alloc(1 + 5 + 1);
 	sprintf(str,"G%05i",gensym_counter++%100000);
 
 	RETURN(cell_cons_t(VAL_SYM,str));

@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "htable.h"
+#include "mem.h"
 #include "util.h"
 
 #define THRESH_GROW   0.7
@@ -86,7 +87,8 @@ static void htable_resize(htable_t *tab, uint32_t cap) {
 	if(cap == tab->cap)
 		return;
 
-	entries = calloc(cap,sizeof *entries);
+	entries = mem_alloc(cap*sizeof *entries);
+	memset(entries,0,cap*sizeof *entries);
 
 	for(int i = 0; i < tab->cap; i++) {
 		for(entry = tab->entries[i]; entry; entry = next) {
@@ -98,8 +100,6 @@ static void htable_resize(htable_t *tab, uint32_t cap) {
 		}
 	}
 
-	free(tab->entries);
-
 	tab->cap = cap;
 	tab->entries = entries;
 }
@@ -107,33 +107,15 @@ static void htable_resize(htable_t *tab, uint32_t cap) {
 htable_t *htable_cons(uint32_t mincap) {
 	htable_t *tab;
 
-	tab = malloc(sizeof *tab); // TODO: GC this
+	tab = mem_alloc(sizeof *tab);
 
 	tab->cap = 1 << (int) (log2((mincap ? mincap : 0x10) - 1) + 1);
 	tab->mincap = mincap;
 	tab->nentries = 0;
-	tab->entries = calloc(tab->cap,sizeof *tab->entries);
+	tab->entries = mem_alloc(tab->cap*sizeof *tab->entries);
+	memset(tab->entries,0,tab->cap*sizeof *tab->entries);
 
 	return tab;
-}
-
-void htable_free(htable_t *tab) {
-	hentry_t *entry, *prev;
-
-	// Free our copies of the keys
-	for(int i = 0; i < tab->cap; i++) {
-		entry = tab->entries[i];
-		while(entry) {
-			prev = entry;
-			entry = entry->next;
-
-			free(prev->key);
-			free(prev);
-		}
-	}
-
-	free(tab->entries);
-	free(tab);
 }
 
 void htable_insert(htable_t *tab, void *key, size_t keylen, hvalue_t val) {
@@ -152,7 +134,7 @@ void htable_insert(htable_t *tab, void *key, size_t keylen, hvalue_t val) {
 	}
 
 	// key isn't in tab (yet)
-	entry = malloc(sizeof *entry); // TODO: GC this
+	entry = mem_alloc(sizeof *entry);
 	entry->key = memdup(key,keylen);
 	entry->keylen = keylen;
 	entry->val = val;
@@ -196,9 +178,6 @@ void htable_remove(htable_t *tab, void *key, size_t keylen) {
 			if(prev)
 				prev->next = entry->next;
 			else tab->entries[index] = entry->next;
-
-			free(entry->key);
-			free(entry);
 
 			// Too few entries?
 			if(--tab->nentries > THRESH_SHRINK*tab->cap)

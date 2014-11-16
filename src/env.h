@@ -6,7 +6,6 @@
 typedef struct env env_t;
 
 env_t *env_cons(env_t *);
-void env_free(env_t *);
 
 env_t *env_parent(env_t *);
 

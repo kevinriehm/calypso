@@ -6,6 +6,7 @@
 #include "cell.h"
 #include "env.h"
 #include "htable.h"
+#include "mem.h"
 
 struct env {
 	struct env *parent;
@@ -16,21 +17,12 @@ struct env {
 env_t *env_cons(env_t *parent) {
 	env_t *env;
 
-	env = malloc(sizeof *env); // TODO: GC this
+	env = mem_alloc(sizeof *env);
 	assert(env);
 	env->parent = parent;
 	env->tab = htable_cons(0);
 
 	return env;
-}
-
-void env_free(env_t *env) {
-	if(!env)
-		return;
-
-	htable_free(env->tab);
-	env_free(env->parent);
-	free(env);
 }
 
 env_t *env_parent(env_t *env) {

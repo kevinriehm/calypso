@@ -27,11 +27,14 @@ typedef struct arena {
 static void *small_alloc(arena_t **arenas, size_t size) {
 	void *p;
 	arena_t *arena;
-	size_t blocksoff, nblocks;
+	size_t align, blocksoff, nblocks;
 
 	assert(size != 0 && !(size & size - 1));
 	assert(size >= sizeof(struct free_block));
-	assert(size >= alignof(max_align_t));
+
+	if(size < alignof(max_align_t))
+		align = size;
+	else align = alignof(max_align_t);
 
 	// Search the existing arenas first
 	for(arena = *arenas; arena && !arena->freelist; arena = arena->next);
@@ -59,8 +62,8 @@ static void *small_alloc(arena_t **arenas, size_t size) {
 	arena->flags = ARENA_NEW;
 
 	nblocks = (ARENA_SIZE - offsetof(arena_t,data))/(size + (float) 2/8);
-	blocksoff = (offsetof(arena_t,data) + (nblocks*2 + 7)/8
-		+ alignof(max_align_t) - 1)&~(alignof(max_align_t) - 1);
+	blocksoff = (offsetof(arena_t,data) + (nblocks*2 + 7)/8 + align - 1)
+		&~(align - 1);
 
 	debug("new small-allocation arena:"
 	    "\n\tbase address: %p"
@@ -88,6 +91,7 @@ void *mem_alloc(size_t size) {
 		const size_t size;
 		arena_t *arenas;
 	} arenas[] = {
+		{8,NULL},
 		{16,NULL},
 		{32,NULL},
 		{0,NULL} // Small < size < ARENA_MAX_ALLOC

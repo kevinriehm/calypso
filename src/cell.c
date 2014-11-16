@@ -7,12 +7,13 @@
 #include "cell.h"
 #include "env.h"
 #include "htable.h"
+#include "mem.h"
 #include "util.h"
 
 cell_t *cell_cons(cell_t *car, cell_t *cdr) {
 	cell_t *cell;
 
-	cell = malloc(sizeof *cell); // TODO: GC this
+	cell = mem_alloc(sizeof *cell);
 	cell->car = car;
 	cell->cdr = cdr;
 
@@ -38,7 +39,7 @@ cell_t *cell_cons_t(cell_type_t type, ...) {
 		cell = malloc((sizeof *cell) + sizeof(lambda_t));
 		memcpy(cell->data,va_arg(ap,lambda_t *),sizeof(lambda_t));
 	} else {
-		cell = malloc(sizeof *cell); // TODO: GC this
+		cell = mem_alloc(sizeof *cell);
 		switch(type) {
 		case VAL_NIL: cell->cdr = NULL; break;
 		case VAL_SYM: cell->sym = va_arg(ap,char *);  break;

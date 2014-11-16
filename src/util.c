@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-void error(char *str, ...) {
+void message(char *type, char *str, ...) {
 	va_list ap;
 
-	fprintf(stderr,"error: ");
+	fprintf(stderr,"%s: ",type);
 
 	va_start(ap,str);
 	vfprintf(stderr,str,ap);

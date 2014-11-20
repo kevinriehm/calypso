@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <math.h>
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -7,19 +8,21 @@
 
 #include "util.h"
 
-#define BUDDY_MIN_EXP    6
-#define BUDDY_MAX_EXP    20
-#define BUDDY_NUM_LEVELS (BUDDY_MAX_EXP - BUDDY_MIN_EXP) // Sic
+#define BUDDY_MIN_EXP 6
+#define BUDDY_MAX_EXP 20
 
 #define BUDDY_MIN_ALLOC (1 << BUDDY_MIN_EXP)
+#define BUDDY_MAX_ALLOC (1 << BUDDY_MAX_EXP - 1)
 
 #define BUDDY_META_BYTES 1
-#define BUDDY_LEVEL_MASK 0x0f
-#define BUDDY_FREE_MASK  0x10
+#define BUDDY_SIZE_MASK  0x0f
+#define BUDDY_ALLOC_BIT  0x10
 #define BUDDY_GC_MASK    0xc0
 
+static_assert((BUDDY_MAX_EXP - BUDDY_MIN_EXP&BUDDY_SIZE_MASK)
+	== BUDDY_MAX_EXP - BUDDY_MIN_EXP,"BUDDY_SIZE_MASK too narrow");
+
 #define ARENA_SIZE      (1 << BUDDY_MAX_EXP)
-#define ARENA_MAX_ALLOC (1 << BUDDY_MAX_EXP - 1)
 
 #define ARENA_TYPE_MASK 0x00000003ul
 #define ARENA_FIXED     0x00000000ul
@@ -27,6 +30,9 @@
 #define ARENA_LARGE     0x00000002ul
 
 #define ARENA_NEW       0x00000004ul
+
+#define BUDDY_FLAGSP(arena, p) ((uint8_t *) \
+	(arena->data + ((char *) (p) - arena->blocks)/BUDDY_MIN_ALLOC))
 
 typedef struct free_block {
 	struct free_block *next;
@@ -45,10 +51,15 @@ typedef struct arena {
 	size_t size;
 	uint32_t flags;
 
-	free_block_t *freelist;
+	union {
+		free_block_t *freelist;
+		char *blocks;
+	};
 
-	uint8_t data[];
+	char data[];
 } arena_t;
+
+static bi_free_block_t buddyfree[BUDDY_MAX_EXP];
 
 static arena_t *alloc_arena() {
 	return aligned_alloc(ARENA_SIZE,ARENA_SIZE);
@@ -114,59 +125,83 @@ static void *fixed_alloc(arena_t **arenas, size_t size) {
 	return (char *) arena + blocksoff;
 }
 
+static void fixed_free(arena_t *arena, void *p) {
+	assert((arena->flags&ARENA_TYPE_MASK) == ARENA_FIXED);
+
+	((free_block_t *) p)->next = arena->freelist;
+	arena->freelist = p;
+}
+
+static void buddy_split_block(arena_t *arena, void *block, int sizeexp) {
+	uint8_t *flags;
+	bi_free_block_t *right;
+
+	right = (bi_free_block_t *) ((char *) block + (1 << sizeexp - 1));
+
+	// Add right to the free list
+	if(right->next = buddyfree[sizeexp - 1].next)
+		right->next->prev = right;
+	right->prev = buddyfree + sizeexp - 1;
+	buddyfree[sizeexp - 1].next = right;
+
+	// Set right's flags
+	flags = BUDDY_FLAGSP(arena,right);
+	*flags = *flags&BUDDY_GC_MASK | sizeexp - 1 - BUDDY_MIN_EXP;
+}
+
+static void *buddy_check_free_lists(int sizeexp) {
+	arena_t *arena;
+	uint8_t *flags;
+	bi_free_block_t *block;
+
+	for(int i = sizeexp; i < BUDDY_MAX_EXP; i++) {
+		// Do we have a free one?
+		if(block = buddyfree[i].next) {
+			// Claim it
+			if(buddyfree[i].next = block->next)
+				buddyfree[i].next->prev = buddyfree  + i;
+
+			// In what arena?
+			arena = (arena_t *)
+				((uintptr_t) block&~(ARENA_SIZE - 1));
+
+			// Split it, as needed
+			while(i > sizeexp)
+				buddy_split_block(arena,block,i--);
+
+			// Mark it as taken
+			flags = BUDDY_FLAGSP(arena,block);
+			*flags = *flags&BUDDY_GC_MASK | BUDDY_ALLOC_BIT
+				| i - BUDDY_MIN_EXP;
+
+			return block;
+		}
+	}
+
+	return NULL;
+}
+
 // Binary buddy allocation
 static void *buddy_alloc(arena_t **arenas, size_t size) {
-	static bi_free_block_t freelists[BUDDY_NUM_LEVELS];
-
 	int sizei;
 	arena_t *arena;
 	size_t headsize, nblocks;
 	bi_free_block_t *block, *half;
 
 	// Find a suitable size
-	static_assert(SIZE_MAX <= UINT64_MAX,"size_t is more than 64 bits");
+	assert(size < 1 << BUDDY_MAX_EXP);
 	sizei = 0;
 	size = (size - 1)*2;
-	if(size >= 1ll << 32) sizei += 32, size >>= 32;
-	if(size >= 1l  << 16) sizei += 16, size >>= 16;
-	if(size >= 1   <<  8) sizei +=  8, size >>=  8;
-	if(size >= 1   <<  4) sizei +=  4, size >>=  4;
-	if(size >= 1   <<  2) sizei +=  2, size >>=  2;
-	if(size >= 1   <<  1) sizei +=  1, size >>=  1;
-	sizei = sizei < BUDDY_MIN_EXP ? 0 : sizei - BUDDY_MIN_EXP;
-	assert(sizei < BUDDY_NUM_LEVELS);
+	if(size >= 1l << 16) sizei += 16, size >>= 16;
+	if(size >= 1  <<  8) sizei +=  8, size >>=  8;
+	if(size >= 1  <<  4) sizei +=  4, size >>=  4;
+	if(size >= 1  <<  2) sizei +=  2, size >>=  2;
+	if(size >= 1  <<  1) sizei +=  1, size >>=  1;
+	assert(sizei < BUDDY_MAX_EXP);
 
-	// Check the freelists
-	arena = NULL;
-check_freelists:
-	for(int i = sizei; i < BUDDY_NUM_LEVELS; i++) {
-		// Do we have a free one?
-		if(block = freelists[i].next) {
-			// Claim it
-			freelists[i].next = block->next;
-			if(freelists[i].next)
-				freelists[i].next->prev = freelists  + i;
-
-			// Split it, as needed
-			while(i > sizei) {
-				i--;
-				half = (bi_free_block_t *)
-					((char *) block
-					+ (1 << BUDDY_MIN_EXP + i)); 
-				// TODO: set half's flags
-				half->next = freelists[i].next;
-				half->prev = freelists + i;
-				if(half->next)
-					half->next->prev = half;
-				freelists[i].next = half;
-			}
-
-			return block;
-		}
-	}
-
-	// Sanity check
-	assert(!arena);
+	// Check the free lists
+	if(block = buddy_check_free_lists(sizei))
+		return block;
 
 	// We need a new arena
 	arena = alloc_arena();
@@ -175,8 +210,10 @@ check_freelists:
 
 	nblocks = (ARENA_SIZE - offsetof(arena_t,data))
 		/(BUDDY_MIN_ALLOC + BUDDY_META_BYTES);
-	headsize = (offsetof(arena_t,data) + nblocks*BUDDY_META_BYTES
-		+ BUDDY_MIN_ALLOC - 1)&~((size_t) BUDDY_MIN_ALLOC - 1);
+	headsize = offsetof(arena_t,data) + nblocks*BUDDY_META_BYTES;
+	headsize = 1 << (int) ceil(log2(headsize));
+
+	arena->blocks = (char *) arena + headsize;
 
 	debug("new buddy-allocation arena:"
 	    "\n\tbase address:    %p"
@@ -185,26 +222,44 @@ check_freelists:
 	    "\n\tmin chunk count: %i"
 	    "\n\toverhead:        %i (%.2f%%)",
 		arena,(int) ARENA_SIZE,(int) 1 << BUDDY_MIN_EXP,(int) nblocks,
-		(int) (ARENA_SIZE - nblocks*BUDDY_MIN_ALLOC),
-		100.*(ARENA_SIZE - nblocks*BUDDY_MIN_ALLOC)/ARENA_SIZE);
+		(int) headsize,100.*headsize/ARENA_SIZE);
 
 	// Split up the new arena for the header
-	for(int i = BUDDY_NUM_LEVELS - 1;
-		i >= 0 && 1 << (BUDDY_MIN_EXP + i) >= headsize; i--) {
-		half = (bi_free_block_t *)
-			((char *) arena + (1 << BUDDY_MIN_EXP + i));
-		// TODO: set half's flags
-		half->next = freelists[i].next;
-		half->prev = freelists + i;
-		if(half->next)
-			half->next->prev = half;
-		freelists[i].next = half;
-	}
+	for(int i = BUDDY_MAX_EXP - 1; 1 << i >= headsize; i--)
+		buddy_split_block(arena,arena,i + 1);
 
 	*arenas = arena;
 
 	// Now we definitely have room
-	goto check_freelists;
+	return buddy_check_free_lists(sizei);
+}
+
+static void buddy_free(arena_t *arena, void *p) {
+	assert((arena->flags&ARENA_TYPE_MASK) == ARENA_BUDDY);
+
+	int sizeexp;
+	void *buddy;
+	uint8_t *bflags, *pflags;
+
+	pflags = BUDDY_FLAGSP(arena,p);
+	sizeexp = BUDDY_MIN_EXP + (*pflags&BUDDY_SIZE_MASK);
+
+	while(true) {
+		buddy = (void *) ((uintptr_t) p ^ 1 << sizeexp);
+		bflags = BUDDY_FLAGSP(arena,buddy);
+
+		if(*bflags&BUDDY_ALLOC_BIT)
+			break;
+
+		sizeexp++;
+
+		if(buddy < p) {
+			p = buddy;
+			pflags = bflags;
+		}
+	}
+
+	*pflags = (*pflags&BUDDY_GC_MASK) | sizeexp - BUDDY_MIN_EXP;
 }
 
 void *mem_alloc(size_t size) {
@@ -228,7 +283,7 @@ void *mem_alloc(size_t size) {
 			return fixed_alloc(&arenas[i].arenas,arenas[i].size);
 
 	// Medium objects use the buddy system
-	if(size < ARENA_MAX_ALLOC)
+	if(size < BUDDY_MAX_ALLOC)
 		return buddy_alloc(&arenas[i].arenas,size);
 
 	// Large objects get their own arenas
@@ -241,5 +296,18 @@ void *mem_alloc(size_t size) {
 }
 
 void mem_free(void *p) {
+	if(!p) return;
+
+	arena_t *arena;
+
+	arena = (arena_t *) ((uintptr_t) p&~(ARENA_SIZE - 1));
+	switch(arena->flags&ARENA_TYPE_MASK) {
+	case ARENA_FIXED: fixed_free(arena,p); break;
+	case ARENA_BUDDY: buddy_free(arena,p); break;
+	case ARENA_LARGE: free(arena); break;
+
+	default: die("unhandled arena type in mem_free(): 0x%08lu",
+		arena->flags&ARENA_TYPE_MASK);
+	}
 }
 

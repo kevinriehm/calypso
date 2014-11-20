@@ -21,8 +21,12 @@
 #define ARENA_SIZE      (1 << BUDDY_MAX_EXP)
 #define ARENA_MAX_ALLOC (1 << BUDDY_MAX_EXP - 1)
 
-#define ARENA_NEW   0x00000001ul
-#define ARENA_BUDDY 0x00000002ul
+#define ARENA_TYPE_MASK 0x00000003ul
+#define ARENA_FIXED     0x00000000ul
+#define ARENA_BUDDY     0x00000001ul
+#define ARENA_LARGE     0x00000002ul
+
+#define ARENA_NEW       0x00000004ul
 
 typedef struct free_block {
 	struct free_block *next;
@@ -33,7 +37,7 @@ typedef struct bi_free_block {
 } bi_free_block_t;
 
 static_assert(sizeof(bi_free_block_t) <= 1 << BUDDY_MIN_EXP,
-	"BUDDY_MIN_EXP to small");
+	"BUDDY_MIN_EXP too small");
 
 typedef struct arena {
 	struct arena *next;
@@ -50,7 +54,7 @@ static arena_t *alloc_arena() {
 	return aligned_alloc(ARENA_SIZE,ARENA_SIZE);
 }
 
-static void *small_alloc(arena_t **arenas, size_t size) {
+static void *fixed_alloc(arena_t **arenas, size_t size) {
 	void *p;
 	arena_t *arena;
 	size_t align, blocksoff, nblocks;
@@ -84,13 +88,13 @@ static void *small_alloc(arena_t **arenas, size_t size) {
 	arena = alloc_arena();
 	arena->next = *arenas;
 	arena->size = size;
-	arena->flags = ARENA_NEW;
+	arena->flags = ARENA_FIXED | ARENA_NEW;
 
 	nblocks = (ARENA_SIZE - offsetof(arena_t,data))/(size + (float) 2/8);
 	blocksoff = (offsetof(arena_t,data) + (nblocks*2 + 7)/8 + align - 1)
 		&~(align - 1);
 
-	debug("new small-allocation arena:"
+	debug("new fixed-size allocation arena:"
 	    "\n\tbase address: %p"
 	    "\n\ttotal size:   %i"
 	    "\n\tchunk size:   %i"
@@ -215,18 +219,25 @@ void *mem_alloc(size_t size) {
 	};
 
 	int i;
+	size_t align;
+	arena_t *arena;
 
 	// Small objects have their own arenas
 	for(i = 0; arenas[i].size; i++)
 		if(size <= arenas[i].size)
-			return small_alloc(&arenas[i].arenas,arenas[i].size);
+			return fixed_alloc(&arenas[i].arenas,arenas[i].size);
 
 	// Medium objects use the buddy system
 	if(size < ARENA_MAX_ALLOC)
 		return buddy_alloc(&arenas[i].arenas,size);
 
-	// Large objects don't even go in arenas
-	return malloc(size);
+	// Large objects get their own arenas
+	align = alignof(max_align_t);
+	size += (offsetof(arena_t,data) + align - 1)&~(align - 1);
+	if(posix_memalign((void **) &arena,ARENA_SIZE,size))
+		die("cannot allocate %lli bytes",(long long) size);
+	arena->flags = ARENA_LARGE;
+	return (void *) ((uintptr_t) (arena->data + align - 1)&~(align - 1));
 }
 
 void mem_free(void *p) {

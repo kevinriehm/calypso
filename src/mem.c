@@ -262,6 +262,22 @@ static void buddy_free(arena_t *arena, void *p) {
 	*pflags = (*pflags&BUDDY_GC_MASK) | sizeexp - BUDDY_MIN_EXP;
 }
 
+static void *large_alloc(size_t size) {
+	size_t align;
+	arena_t *arena;
+
+	align = alignof(max_align_t);
+	size += (offsetof(arena_t,data) + align - 1)&~(align - 1);
+	if(posix_memalign((void **) &arena,ARENA_SIZE,size))
+		die("cannot allocate %lli bytes",(long long) size);
+	arena->flags = ARENA_LARGE;
+	return (void *) ((uintptr_t) (arena->data + align - 1)&~(align - 1));
+}
+
+static void *large_free(arena_t *arena, void *p) {
+	free(arena);
+}
+
 void *mem_alloc(size_t size) {
 	static struct {
 		const size_t size;
@@ -274,8 +290,6 @@ void *mem_alloc(size_t size) {
 	};
 
 	int i;
-	size_t align;
-	arena_t *arena;
 
 	// Small objects have their own arenas
 	for(i = 0; arenas[i].size; i++)
@@ -287,12 +301,7 @@ void *mem_alloc(size_t size) {
 		return buddy_alloc(&arenas[i].arenas,size);
 
 	// Large objects get their own arenas
-	align = alignof(max_align_t);
-	size += (offsetof(arena_t,data) + align - 1)&~(align - 1);
-	if(posix_memalign((void **) &arena,ARENA_SIZE,size))
-		die("cannot allocate %lli bytes",(long long) size);
-	arena->flags = ARENA_LARGE;
-	return (void *) ((uintptr_t) (arena->data + align - 1)&~(align - 1));
+	return large_alloc(size);
 }
 
 void mem_free(void *p) {
@@ -304,7 +313,7 @@ void mem_free(void *p) {
 	switch(arena->flags&ARENA_TYPE_MASK) {
 	case ARENA_FIXED: fixed_free(arena,p); break;
 	case ARENA_BUDDY: buddy_free(arena,p); break;
-	case ARENA_LARGE: free(arena); break;
+	case ARENA_LARGE: large_free(arena,p); break;
 
 	default: die("unhandled arena type in mem_free(): 0x%08lu",
 		arena->flags&ARENA_TYPE_MASK);

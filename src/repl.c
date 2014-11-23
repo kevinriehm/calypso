@@ -138,10 +138,13 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 #define NARGS(...) NARGS__( \
 	NARGS_HAS_COMMA(__VA_ARGS__), \
 	NARGS_HAS_COMMA(NARGS_COMMA __VA_ARGS__ ()), \
-	NARGS_(__VA_ARGS__,10,9,8,7,6,5,4,3,2,1) \
+	NARGS_(__VA_ARGS__,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9, \
+		8,7,6,5,4,3,2,1) \
 )
-#define NARGS_(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,n, ...) n
-#define NARGS_HAS_COMMA(...) NARGS_(__VA_ARGS__,1,1,1,1,1,1,1,1,1,0)
+#define NARGS_(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,_11,_12,_13,_14,_15,_16,_17, \
+	_18,_19,_20,_21,_22,_23,_24,_25,n, ...) n
+#define NARGS_HAS_COMMA(...) NARGS_(__VA_ARGS__,1,1,1,1,1,1,1,1,1,1,1,1,1,1, \
+	1,1,1,1,1,1,1,1,1,1,0)
 #define NARGS_COMMA() ,
 #define NARGS__(a, b, n) NARGS___(a,b,n)
 #define NARGS___(a, b, n) NARGS___##a##b(n)
@@ -152,6 +155,56 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 #define VAR_ARG(base, ...) VAR_ARG_(base,NARGS(__VA_ARGS__),__VA_ARGS__)
 #define VAR_ARG_(base, num, ...) VAR_ARG__(base,num,__VA_ARGS__)
 #define VAR_ARG__(base, num, ...) base##num (__VA_ARGS__)
+
+#define QUAL_v     volatile
+#define QUAL_pv   *volatile
+#define QUAL_vpv   volatile *volatile
+#define QUAL_pvpv *volatile *volatile
+
+#define DECLARE_VARS_(...) DECLARE_VARS__(NARGS(__VA_ARGS__),__VA_ARGS__)
+#define DECLARE_VARS__(num, ...) DECLARE_VARS___(num,__VA_ARGS__)
+#define DECLARE_VARS___(num, ...) DECLARE_VARS___##num(__VA_ARGS__)
+#define DECLARE_VARS___3(t, q, var) t q var
+#define DECLARE_VARS___4(t, q, var, ...) \
+	t q var; DECLARE_VARS___3(t,q,__VA_ARGS__)
+#define DECLARE_VARS___5(t, q, var, ...) \
+	t q var; DECLARE_VARS___4(t,q,__VA_ARGS__)
+#define DECLARE_VARS___6(t, q, var, ...) \
+	t q var; DECLARE_VARS___5(t,q,__VA_ARGS__)
+#define DECLARE_VARS___7(t, q, var, ...) \
+	t q var; DECLARE_VARS___6(t,q,__VA_ARGS__)
+#define DECLARE_VARS___8(t, q, var, ...) \
+	t q var; DECLARE_VARS___7(t,q,__VA_ARGS__)
+#define DECLARE_VARS___9(t, q, var, ...) \
+	t q var; DECLARE_VARS___8(t,q,__VA_ARGS__)
+#define DECLARE_VARS___10(t, q, var, ...) \
+	t q var; DECLARE_VARS___9(t,q,__VA_ARGS__)
+#define DECLARE_VARS___11(t, q, var, ...) \
+	t q var; DECLARE_VARS___10(t,q,__VA_ARGS__)
+#define DECLARE_VARS___12(t, q, var, ...) \
+	t q var; DECLARE_VARS___11(t,q,__VA_ARGS__)
+#define DECLARE_VARS___13(t, q, var, ...) \
+	t q var; DECLARE_VARS___12(t,q,__VA_ARGS__)
+#define DECLARE_VARS___14(t, q, var, ...) \
+	t q var; DECLARE_VARS___13(t,q,__VA_ARGS__)
+
+#define DECLARE_VARS3(type, q, vars) DECLARE_VARS_(type,QUAL_##q,EXPAND vars)
+#define DECLARE_VARS6(type, q, vars, ...) \
+	DECLARE_VARS3(type,q,vars); DECLARE_VARS3(__VA_ARGS__)
+#define DECLARE_VARS9(type, q, vars, ...) \
+	DECLARE_VARS3(type,q,vars); DECLARE_VARS6(__VA_ARGS__)
+#define DECLARE_VARS12(type, q, vars, ...) \
+	DECLARE_VARS3(type,q,vars); DECLARE_VARS9(__VA_ARGS__)
+#define DECLARE_VARS15(type, q, vars, ...) \
+	DECLARE_VARS3(type,q,vars); DECLARE_VARS12(__VA_ARGS__)
+#define DECLARE_VARS18(type, q, vars, ...) \
+	DECLARE_VARS3(type,q,vars); DECLARE_VARS15(__VA_ARGS__)
+#define DECLARE_VARS21(type, q, vars, ...) \
+	DECLARE_VARS3(type,q,vars); DECLARE_VARS18(__VA_ARGS__)
+#define DECLARE_VARS24(type, q, vars, ...) \
+	DECLARE_VARS3(type,q,vars); DECLARE_VARS21(__VA_ARGS__)
+
+#define DECLARE_VARS(...) VAR_ARG(DECLARE_VARS,__VA_ARGS__)
 
 #define SAVE0()
 #define SAVE1(arg)      STACK_PUSH(stack,arg)
@@ -171,8 +224,13 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 #define LOAD6(arg, ...) LOAD5(__VA_ARGS__); STACK_POP(stack,arg)
 #define LOAD7(arg, ...) LOAD6(__VA_ARGS__); STACK_POP(stack,arg)
 
-#define SAVE(...) VAR_ARG(SAVE,__VA_ARGS__)
-#define LOAD(...) VAR_ARG(LOAD,__VA_ARGS__)
+#define SAVE(func) SAVE_(func)
+#define SAVE_(func) SAVE__(PRESERVE_##func)
+#define SAVE__(...) VAR_ARG(SAVE,__VA_ARGS__)
+
+#define LOAD(func) LOAD_(func)
+#define LOAD_(func) LOAD__(PRESERVE_##func)
+#define LOAD__(...) VAR_ARG(LOAD,__VA_ARGS__)
 
 #define SET2(name, val)       name = (val)
 #define SET4(name, val, ...)  name = (val); SET2(__VA_ARGS__)
@@ -182,21 +240,23 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 
 #define SET(...) VAR_ARG(SET,__VA_ARGS__)
 
+#define LABEL FUNCTION:
+
 #define CALL(fcn, ...) do { \
-	EXPAND(SAVE(PRESERVE)); \
+	SAVE(FUNCTION); \
 \
-	EXPAND(SET(__VA_ARGS__)); \
+	SET(__VA_ARGS__); \
 \
 	STACK_ALLOC(stack,jmp_buf); \
 	if(!setjmp(STACK_TOP(stack,jmp_buf))) \
 		goto fcn; \
 	STACK_FREE(stack,jmp_buf); \
 \
-	EXPAND(LOAD(PRESERVE)); \
+	LOAD(FUNCTION); \
 } while(0)
 
 #define JMP(fcn, ...) do { \
-	EXPAND(SET(__VA_ARGS__)); \
+	SET(__VA_ARGS__); \
 	goto fcn; \
 } while(0)
 
@@ -259,7 +319,7 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 #define JMP_SUB(_env, _args) \
 	JMP(sub,env,(_env),args,(_args))
 
-cell_t *eval(env_t *volatile env, cell_t *volatile sexp) {
+cell_t *eval(env_t *_env, cell_t *_sexp) {
 	static int gensym_counter = 0;
 
 	static stack_t stack = {
@@ -267,35 +327,26 @@ cell_t *eval(env_t *volatile env, cell_t *volatile sexp) {
 		.bottom = NULL
 	};
 
-	cell_t *volatile retval;
-	cell_t *volatile op;
-	env_t *volatile envout;
-	cell_t *volatile template;
-	cell_t *volatile args;
-	bool volatile ismacro;
-	cell_t *volatile head, *volatile *volatile tail;
-	env_t *volatile lambenv;
-	lambda_t *volatile lambp;
-	cell_t *volatile body;
-	cell_t *volatile pair;
-	cell_t *volatile a, *volatile b;
+	DECLARE_VARS(EVAL_VARS);
+
 	char *str;
 	lambda_t lamb;
-	bool volatile splice, *volatile splicep;
-	cell_t *volatile sym;
-	double volatile dbl, xdbl;
-	int64_t volatile i64, xi64;
+	double xdbl;
+	int64_t xi64;
 	cell_type_t type;
-	cell_t *x;
+
+	// Initialize the variables
+	env = _env;
+	sexp = _sexp;
 
 	// Initialize the stack
 	if(!stack.bottom)
 		stack.bottom = malloc(stack.size*sizeof *stack.bottom);
 	stack.top = stack.bottom;
 
-eval:
-#undef PRESERVE
-#define PRESERVE env, sexp, op
+#undef FUNCTION
+#define FUNCTION eval
+LABEL
 	if(!sexp)
 		RETURN(sexp);
 
@@ -358,9 +409,9 @@ eval:
 
 	RETURN(NULL);
 
-bind_args:
-#undef PRESERVE
-#define PRESERVE env, envout, template, args, ismacro, head, tail
+#undef FUNCTION
+#define FUNCTION bind_args
+LABEL
 	for(; args && template; args = args->cdr, template = template->cdr) {
 		// Skip nils in the template
 		while(!template->car)
@@ -395,9 +446,9 @@ bind_args:
 
 	RETURN(NULL);
 
-eval_lambda:
-#undef PRESERVE
-#define PRESERVE lambenv, lambp, body
+#undef FUNCTION
+#define FUNCTION eval_lambda
+LABEL
 	lambenv = env_cons(lambp->env);
 
 	// Bind the arguments
@@ -410,9 +461,9 @@ eval_lambda:
 	// Jump right to the last body expression
 	JMP_EVAL(lambenv,body->car);
 
-append:
-#undef PRESERVE
-#define PRESERVE env, args, head, tail
+#undef FUNCTION
+#define FUNCTION append
+LABEL
 	for(head = NULL, tail = &head; args; args = args->cdr) {
 		EVAL(env,args->car);
 
@@ -429,17 +480,17 @@ append:
 
 	RETURN(head);
 
-atom:
-#undef PRESERVE
-#define PRESERVE
+#undef FUNCTION
+#define FUNCTION atom
+LABEL
 	check(args && !args->cdr,"too many arguments to atom");
 
 	EVAL(env,args->car);
 	RETURN(cell_is_atom(retval) ? sym_t : NULL);
 
-car:
-#undef PRESERVE
-#define PRESERVE
+#undef FUNCTION
+#define FUNCTION car
+LABEL
 	check(args && !args->cdr,"too many arguments to car");
 	EVAL(env,args->car);
 
@@ -448,9 +499,9 @@ car:
 
 	RETURN(retval->car);
 
-cdr:
-#undef PRESERVE
-#define PRESERVE
+#undef FUNCTION
+#define FUNCTION cdr
+LABEL
 	check(args && !args->cdr,"too many arguments to cdr");
 	EVAL(env,args->car);
 
@@ -459,9 +510,9 @@ cdr:
 
 	RETURN(retval->cdr);
 
-cond:
-#undef PRESERVE
-#define PRESERVE env, args, pair
+#undef FUNCTION
+#define FUNCTION cond
+LABEL
 	for(; args; args = args->cdr) {
 		pair = args->car;
 		check(pair && pair->cdr && !pair->cdr->cdr,
@@ -474,9 +525,9 @@ cond:
 
 	RETURN(NULL);
 
-cons:
-#undef PRESERVE
-#define PRESERVE env, args, sexp
+#undef FUNCTION
+#define FUNCTION cons
+LABEL
 	check(args && args->cdr,"too few arguments to cons");
 	check(!args->cdr->cdr,"too many arguments to cons");
 
@@ -486,9 +537,9 @@ cons:
 
 	RETURN(cell_cons(sexp,retval));
 
-eq:
-#undef PRESERVE
-#define PRESERVE env, args, a
+#undef FUNCTION
+#define FUNCTION eq
+LABEL
 	check(args && args->cdr,"too few arguments to eq");
 	check(!args->cdr->cdr,"too many arguments to eq");
 
@@ -529,9 +580,9 @@ eq:
 		RETURN(NULL);
 	}
 
-gensym:
-#undef PRESERVE
-#define PRESERVE
+#undef FUNCTION
+#define FUNCTION gensym
+LABEL
 	check(!args,"too many arguments to gensym");
 
 	str = mem_alloc(1 + 5 + 1);
@@ -539,9 +590,9 @@ gensym:
 
 	RETURN(cell_cons_t(VAL_SYM,str));
 
-lambda:
-#undef PRESERVE
-#define PRESERVE
+#undef FUNCTION
+#define FUNCTION lambda
+LABEL
 	check(args,"missing lambda parameter list");
 
 	// Set up the lambda
@@ -552,9 +603,9 @@ lambda:
 
 	RETURN(cell_cons_t(VAL_LBA,&lamb));
 
-macro:
-#undef PRESERVE
-#define PRESERVE
+#undef FUNCTION
+#define FUNCTION macro
+LABEL
 	check(args,"missing macro parameter list");
 
 	// Set up the macro
@@ -565,9 +616,9 @@ macro:
 
 	RETURN(cell_cons_t(VAL_LBA,&lamb));
 
-macroexpand:
-#undef PRESERVE
-#define PRESERVE env, sexp
+#undef FUNCTION
+#define FUNCTION macroexpand
+LABEL
 	check(args && !args->cdr,
 		"incorrect number of arguments to macroexpand");
 
@@ -589,9 +640,9 @@ macroexpand:
 
 	RETURN(sexp);
 
-macroexpand_1:
-#undef PRESERVE
-#define PRESERVE env, sexp
+#undef FUNCTION
+#define FUNCTION macroexpand_1
+LABEL
 	check(args && !args->cdr,
 		"incorrect number of arguments to macroexpand-1");
 
@@ -608,9 +659,9 @@ macroexpand_1:
 
 	JMP_EVAL_LAMBDA(NULL,cell_lba(op),sexp->cdr);
 
-print:
-#undef PRESERVE
-#define PRESERVE env, args
+#undef FUNCTION
+#define FUNCTION print
+LABEL
 	for(; args; args = args->cdr) {
 		EVAL(env,args->car);
 		print(retval);
@@ -618,18 +669,18 @@ print:
 
 	RETURN(NULL);
 
-quasiquote:
-#undef PRESERVE
-#define PRESERVE
+#undef FUNCTION
+#define FUNCTION quasiquote
+LABEL
 	check(args,"too few arguments to quasiquote");
 	check(!args->cdr,"too many arguments to quasiquote");
 
 	sexp = args->car;
 	splicep = NULL;
 
-quasiquote_unquote:
-#undef PRESERVE
-#define PRESERVE env, sexp, head, tail, splicep
+#undef FUNCTION
+#define FUNCTION quasiquote_unquote
+LABEL
 	// Default
 	if(splicep)
 		*splicep = false;
@@ -680,17 +731,17 @@ quasiquote_unquote:
 
 	RETURN(head);
 
-quote:
-#undef PRESERVE
-#define PRESERVE
+#undef FUNCTION
+#define FUNCTION quote
+LABEL
 	check(args,"too few arguments to quote");
 	check(!args->cdr,"too many arguments to quote");
 
 	RETURN(args->car);
 
-assign:
-#undef PRESERVE
-#define PRESERVE env, sym
+#undef FUNCTION
+#define FUNCTION assign
+LABEL
 	check(args && args->cdr,"too few arguments to =");
 	check(!args->cdr->cdr,"too many arguments to =");
 
@@ -707,9 +758,9 @@ assign:
 
 	RETURN(retval);
 
-add:
-#undef PRESERVE
-#define PRESERVE env, args, dbl, i64, type
+#undef FUNCTION
+#define FUNCTION add
+LABEL
 	dbl = i64 = 0;
 	type = VAL_NIL;
 	for(; args; args = args->cdr) {
@@ -740,9 +791,9 @@ add_x:
 	case VAL_DBL: RETURN(cell_cons_t(VAL_DBL,dbl));
 	}
 
-sub:
-#undef PRESERVE
-#define PRESERVE env, args, dbl, i64, type
+#undef FUNCTION
+#define FUNCTION sub
+LABEL
 	dbl = i64 = 0;
 	type = VAL_NIL;
 	for(; args; args = args->cdr) {

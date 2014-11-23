@@ -12,16 +12,12 @@
 #include "grammar.h"
 #include "mem.h"
 #include "repl.h"
+#include "stack.h"
 #include "token.h"
 #include "util.h"
 
 #define STACK_MAX_SIZE 10000000
 #define STACK_GROWTH   1.4
-
-typedef struct {
-	size_t size;
-	char *bottom, *top;
-} stack_t;
 
 int lineno;
 char *filename;
@@ -157,50 +153,23 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 #define VAR_ARG_(base, num, ...) VAR_ARG__(base,num,__VA_ARGS__)
 #define VAR_ARG__(base, num, ...) base##num (__VA_ARGS__)
 
-#define STACK_ENSURE_SPACE(nbytes) ( \
-	stack.top + (nbytes) - stack.bottom > stack.size \
-		? grow_stack(&stack,(nbytes)) : (void) 0 \
-)
-
-#define STACK_ALLOC(type) ( \
-	STACK_ENSURE_SPACE(sizeof(type)), \
-	stack.top += sizeof(type), \
-	STACK_TOP(type) \
-)
-
-#define STACK_FREE(type) do { stack.top -= sizeof(type); } while(0)
-
-#define STACK_TOP(type) (*(type *) (stack.top - sizeof(type)))
-
-#define PUSH(var) do { \
-	STACK_ENSURE_SPACE(sizeof (var)); \
-	memcpy(stack.top,(void *) &(var),sizeof (var)); \
-	stack.top += sizeof (var); \
-} while(0)
-
-#define POP(var) do { \
-	assert(stack.top - stack.bottom >= sizeof (var)); \
-	stack.top -= sizeof (var); \
-	memcpy((void *) &(var),stack.top,sizeof (var)); \
-} while(0)
-
 #define SAVE0()
-#define SAVE1(arg)      PUSH(arg)
-#define SAVE2(arg, ...) PUSH(arg); SAVE1(__VA_ARGS__)
-#define SAVE3(arg, ...) PUSH(arg); SAVE2(__VA_ARGS__)
-#define SAVE4(arg, ...) PUSH(arg); SAVE3(__VA_ARGS__)
-#define SAVE5(arg, ...) PUSH(arg); SAVE4(__VA_ARGS__)
-#define SAVE6(arg, ...) PUSH(arg); SAVE5(__VA_ARGS__)
-#define SAVE7(arg, ...) PUSH(arg); SAVE6(__VA_ARGS__)
+#define SAVE1(arg)      STACK_PUSH(stack,arg)
+#define SAVE2(arg, ...) STACK_PUSH(stack,arg); SAVE1(__VA_ARGS__)
+#define SAVE3(arg, ...) STACK_PUSH(stack,arg); SAVE2(__VA_ARGS__)
+#define SAVE4(arg, ...) STACK_PUSH(stack,arg); SAVE3(__VA_ARGS__)
+#define SAVE5(arg, ...) STACK_PUSH(stack,arg); SAVE4(__VA_ARGS__)
+#define SAVE6(arg, ...) STACK_PUSH(stack,arg); SAVE5(__VA_ARGS__)
+#define SAVE7(arg, ...) STACK_PUSH(stack,arg); SAVE6(__VA_ARGS__)
 
 #define LOAD0()
-#define LOAD1(arg)      POP(arg)
-#define LOAD2(arg, ...) LOAD1(__VA_ARGS__); POP(arg)
-#define LOAD3(arg, ...) LOAD2(__VA_ARGS__); POP(arg)
-#define LOAD4(arg, ...) LOAD3(__VA_ARGS__); POP(arg)
-#define LOAD5(arg, ...) LOAD4(__VA_ARGS__); POP(arg)
-#define LOAD6(arg, ...) LOAD5(__VA_ARGS__); POP(arg)
-#define LOAD7(arg, ...) LOAD6(__VA_ARGS__); POP(arg)
+#define LOAD1(arg)      STACK_POP(stack,arg)
+#define LOAD2(arg, ...) LOAD1(__VA_ARGS__); STACK_POP(stack,arg)
+#define LOAD3(arg, ...) LOAD2(__VA_ARGS__); STACK_POP(stack,arg)
+#define LOAD4(arg, ...) LOAD3(__VA_ARGS__); STACK_POP(stack,arg)
+#define LOAD5(arg, ...) LOAD4(__VA_ARGS__); STACK_POP(stack,arg)
+#define LOAD6(arg, ...) LOAD5(__VA_ARGS__); STACK_POP(stack,arg)
+#define LOAD7(arg, ...) LOAD6(__VA_ARGS__); STACK_POP(stack,arg)
 
 #define SAVE(...) VAR_ARG(SAVE,__VA_ARGS__)
 #define LOAD(...) VAR_ARG(LOAD,__VA_ARGS__)
@@ -218,10 +187,10 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 \
 	EXPAND(SET(__VA_ARGS__)); \
 \
-	STACK_ALLOC(jmp_buf); \
-	if(!setjmp(STACK_TOP(jmp_buf))) \
+	STACK_ALLOC(stack,jmp_buf); \
+	if(!setjmp(STACK_TOP(stack,jmp_buf))) \
 		goto fcn; \
-	STACK_FREE(jmp_buf); \
+	STACK_FREE(stack,jmp_buf); \
 \
 	EXPAND(LOAD(PRESERVE)); \
 } while(0)
@@ -237,7 +206,7 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 	if(stack.top == stack.bottom) \
 		return retval; \
 \
-	longjmp(STACK_TOP(jmp_buf),1); \
+	longjmp(STACK_TOP(stack,jmp_buf),1); \
 } while(0)
 
 #define EVAL(_env, _sexp) \

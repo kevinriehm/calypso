@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include "grammar.h"
+#include "mem.h"
 #include "repl.h"
 #include "token.h"
 #include "util.h"
@@ -233,7 +234,7 @@ refill:
 			};
 
 			'"' ([^"\\] | EC)* '"' => {
-				val->str = memdup(s->ts + 1,
+				val->str = mem_dup(s->ts + 1,
 					val->len = s->te - s->ts - 2);
 				ret = TOK_STRING;
 				fbreak;
@@ -241,7 +242,7 @@ refill:
 
 			[a-zA-Z$_][a-zA-Z0-9$_\-]* |
 			[=+\-]                  => {
-				val->str = memdup(s->ts,
+				val->str = mem_dup(s->ts,
 					val->len = s->te - s->ts);
 				ret = TOK_SYMBOL;
 				fbreak;

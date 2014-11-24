@@ -26,7 +26,5 @@
 void message(char *, char *, ...);
 void die(char *, ...);
 
-void *memdup(void *, size_t);
-
 #endif
 

@@ -7,7 +7,6 @@
 
 #include "htable.h"
 #include "mem.h"
-#include "util.h"
 
 #define THRESH_GROW   0.7
 #define THRESH_SHRINK 0.3
@@ -135,7 +134,7 @@ void htable_insert(htable_t *tab, void *key, size_t keylen, hvalue_t val) {
 
 	// key isn't in tab (yet)
 	entry = mem_alloc(sizeof *entry);
-	entry->key = memdup(key,keylen);
+	entry->key = mem_dup(key,keylen);
 	entry->keylen = keylen;
 	entry->val = val;
 	entry->next = tab->entries[index];

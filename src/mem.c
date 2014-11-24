@@ -326,6 +326,10 @@ void mem_free(void *p) {
 	}
 }
 
+void *mem_dup(void *p, size_t n) {
+	return memcpy(mem_alloc(n),p,n);
+}
+
 #define QUAL_v
 #define QUAL_pv   *
 #define QUAL_vpv  *

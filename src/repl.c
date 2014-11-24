@@ -65,9 +65,10 @@ void builtin_init(env_t *env) {
 	};
 
 	// Cache important symbols
-	str_t = cell_str_intern("t",1);
-	str_unquote = cell_str_intern("unquote",7);
-	str_unquote_splicing = cell_str_intern("unquote-splicing",16);
+	str_t = cell_str_intern(mem_dup("t",1),1);
+	str_unquote = cell_str_intern(mem_dup("unquote",7),7);
+	str_unquote_splicing
+		= cell_str_intern(mem_dup("unquote-splicing",16),16);
 
 	// Canonical truth symbol
 	sym_t = cell_cons_t(VAL_SYM,str_t);

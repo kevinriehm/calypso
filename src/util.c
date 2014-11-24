@@ -31,12 +31,3 @@ void die(char *str, ...) {
 	exit(EXIT_FAILURE);
 }
 
-void *memdup(void *p, size_t n) {
-	void *newp;
-
-	newp = mem_alloc(n);
-	memcpy(newp,p,n);
-
-	return newp;
-}
-

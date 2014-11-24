@@ -15,6 +15,7 @@
 #include "stack.h"
 #include "token.h"
 #include "util.h"
+#include "va_macro.h"
 
 #define STACK_MAX_SIZE 10000000
 #define STACK_GROWTH   1.4
@@ -133,78 +134,10 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 	stack->bottom = newstack;
 }
 
-#define EXPAND(...) __VA_ARGS__
-
-#define NARGS(...) NARGS__( \
-	NARGS_HAS_COMMA(__VA_ARGS__), \
-	NARGS_HAS_COMMA(NARGS_COMMA __VA_ARGS__ ()), \
-	NARGS_(__VA_ARGS__,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9, \
-		8,7,6,5,4,3,2,1) \
-)
-#define NARGS_(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,_11,_12,_13,_14,_15,_16,_17, \
-	_18,_19,_20,_21,_22,_23,_24,_25,n, ...) n
-#define NARGS_HAS_COMMA(...) NARGS_(__VA_ARGS__,1,1,1,1,1,1,1,1,1,1,1,1,1,1, \
-	1,1,1,1,1,1,1,1,1,1,0)
-#define NARGS_COMMA() ,
-#define NARGS__(a, b, n) NARGS___(a,b,n)
-#define NARGS___(a, b, n) NARGS___##a##b(n)
-#define NARGS___01(n) 0
-#define NARGS___00(n) 1
-#define NARGS___11(n) n
-
-#define VAR_ARG(base, ...) VAR_ARG_(base,NARGS(__VA_ARGS__),__VA_ARGS__)
-#define VAR_ARG_(base, num, ...) VAR_ARG__(base,num,__VA_ARGS__)
-#define VAR_ARG__(base, num, ...) base##num (__VA_ARGS__)
-
 #define QUAL_v     volatile
 #define QUAL_pv   *volatile
 #define QUAL_vpv   volatile *volatile
 #define QUAL_pvpv *volatile *volatile
-
-#define DECLARE_VARS_(...) DECLARE_VARS__(NARGS(__VA_ARGS__),__VA_ARGS__)
-#define DECLARE_VARS__(num, ...) DECLARE_VARS___(num,__VA_ARGS__)
-#define DECLARE_VARS___(num, ...) DECLARE_VARS___##num(__VA_ARGS__)
-#define DECLARE_VARS___3(t, q, var) t q var
-#define DECLARE_VARS___4(t, q, var, ...) \
-	t q var; DECLARE_VARS___3(t,q,__VA_ARGS__)
-#define DECLARE_VARS___5(t, q, var, ...) \
-	t q var; DECLARE_VARS___4(t,q,__VA_ARGS__)
-#define DECLARE_VARS___6(t, q, var, ...) \
-	t q var; DECLARE_VARS___5(t,q,__VA_ARGS__)
-#define DECLARE_VARS___7(t, q, var, ...) \
-	t q var; DECLARE_VARS___6(t,q,__VA_ARGS__)
-#define DECLARE_VARS___8(t, q, var, ...) \
-	t q var; DECLARE_VARS___7(t,q,__VA_ARGS__)
-#define DECLARE_VARS___9(t, q, var, ...) \
-	t q var; DECLARE_VARS___8(t,q,__VA_ARGS__)
-#define DECLARE_VARS___10(t, q, var, ...) \
-	t q var; DECLARE_VARS___9(t,q,__VA_ARGS__)
-#define DECLARE_VARS___11(t, q, var, ...) \
-	t q var; DECLARE_VARS___10(t,q,__VA_ARGS__)
-#define DECLARE_VARS___12(t, q, var, ...) \
-	t q var; DECLARE_VARS___11(t,q,__VA_ARGS__)
-#define DECLARE_VARS___13(t, q, var, ...) \
-	t q var; DECLARE_VARS___12(t,q,__VA_ARGS__)
-#define DECLARE_VARS___14(t, q, var, ...) \
-	t q var; DECLARE_VARS___13(t,q,__VA_ARGS__)
-
-#define DECLARE_VARS3(type, q, vars) DECLARE_VARS_(type,QUAL_##q,EXPAND vars)
-#define DECLARE_VARS6(type, q, vars, ...) \
-	DECLARE_VARS3(type,q,vars); DECLARE_VARS3(__VA_ARGS__)
-#define DECLARE_VARS9(type, q, vars, ...) \
-	DECLARE_VARS3(type,q,vars); DECLARE_VARS6(__VA_ARGS__)
-#define DECLARE_VARS12(type, q, vars, ...) \
-	DECLARE_VARS3(type,q,vars); DECLARE_VARS9(__VA_ARGS__)
-#define DECLARE_VARS15(type, q, vars, ...) \
-	DECLARE_VARS3(type,q,vars); DECLARE_VARS12(__VA_ARGS__)
-#define DECLARE_VARS18(type, q, vars, ...) \
-	DECLARE_VARS3(type,q,vars); DECLARE_VARS15(__VA_ARGS__)
-#define DECLARE_VARS21(type, q, vars, ...) \
-	DECLARE_VARS3(type,q,vars); DECLARE_VARS18(__VA_ARGS__)
-#define DECLARE_VARS24(type, q, vars, ...) \
-	DECLARE_VARS3(type,q,vars); DECLARE_VARS21(__VA_ARGS__)
-
-#define DECLARE_VARS(...) VAR_ARG(DECLARE_VARS,__VA_ARGS__)
 
 #define SAVE0()
 #define SAVE1(arg)      STACK_PUSH(stack,arg)
@@ -243,16 +176,18 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 #define LABEL FUNCTION:
 
 #define CALL(fcn, ...) do { \
+	*STACK_ALLOC(stack,enum builtin) = PREFIX_BUILTIN(,FUNCTION); \
 	SAVE(FUNCTION); \
 \
 	SET(__VA_ARGS__); \
 \
 	STACK_ALLOC(stack,jmp_buf); \
-	if(!setjmp(STACK_TOP(stack,jmp_buf))) \
+	if(!setjmp(*STACK_TOP(stack,jmp_buf))) \
 		goto fcn; \
 	STACK_FREE(stack,jmp_buf); \
 \
 	LOAD(FUNCTION); \
+	STACK_FREE(stack,enum builtin); \
 } while(0)
 
 #define JMP(fcn, ...) do { \
@@ -266,7 +201,7 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 	if(stack.top == stack.bottom) \
 		return retval; \
 \
-	longjmp(STACK_TOP(stack,jmp_buf),1); \
+	longjmp(*STACK_TOP(stack,jmp_buf),1); \
 } while(0)
 
 #define EVAL(_env, _sexp) \
@@ -327,13 +262,12 @@ cell_t *eval(env_t *_env, cell_t *_sexp) {
 		.bottom = NULL
 	};
 
-	DECLARE_VARS(EVAL_VARS);
+	EXPAND(EACH(PRINT_VARS,(;),(),EVAL_VARS));
 
 	char *str;
 	lambda_t lamb;
 	double xdbl;
 	int64_t xi64;
-	cell_type_t type;
 
 	// Initialize the variables
 	env = _env;

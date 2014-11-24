@@ -3,8 +3,12 @@
 
 #include <stddef.h>
 
+struct stack;
+
 void *mem_alloc(size_t);
 void mem_free(void *);
+
+void mem_gc(struct stack *);
 
 #endif
 

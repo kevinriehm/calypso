@@ -14,7 +14,7 @@
 
 #define STACK_FREE(s, type) ((s).top -= sizeof(type))
 
-#define STACK_TOP(s, type) (*(type *) ((s).top - sizeof(type)))
+#define STACK_TOP(s, type) ((type *) ((s).top - sizeof(type)))
 
 #define STACK_PUSH(s, var) do { \
 	STACK_ENSURE_SPACE(s, sizeof (var)); \

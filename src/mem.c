@@ -5,8 +5,14 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
+#include "cell.h"
+#include "env.h"
+#include "repl.h"
+#include "stack.h"
 #include "util.h"
+#include "va_macro.h"
 
 #define BUDDY_MIN_EXP 6
 #define BUDDY_MAX_EXP 20
@@ -317,6 +323,88 @@ void mem_free(void *p) {
 
 	default: die("unhandled arena type in mem_free(): 0x%08lu",
 		arena->flags&ARENA_TYPE_MASK);
+	}
+}
+
+#define QUAL_v
+#define QUAL_pv   *
+#define QUAL_vpv  *
+#define QUAL_pvpv **
+
+#define SQUAL_v
+#define SQUAL_pv   p
+#define SQUAL_vpv  p
+#define SQUAL_pvpv pp
+
+#define MARK_VAR_FROM_DATA(all, var) do { \
+	memcpy(&evalvars.var,data,sizeof evalvars.var); \
+	data += sizeof evalvars.var; \
+	mark_##var(evalvars.var); \
+} while(0)
+
+#define HANDLE_STACK_FRAME(all, fcn) \
+case PREFIX_BUILTIN(,fcn): \
+	DEFER(EACH_INDIRECT)()(MARK_VAR_FROM_DATA,(;),,PRESERVE_##fcn); \
+	break
+
+#define MARK_TYPE(t, sq) MARK_TYPE_(t, sq)
+#define MARK_TYPE_(type, squal) mark_##type##_##squal
+
+#define MARK_SHIM(all, var) MARK_SHIM_(all, var)
+#define MARK_SHIM_(t, q, v) MARK_SHIM__(t, q, SQUAL_##q, v)
+#define MARK_SHIM__(t, q, sq, v) MARK_SHIM___(t, q, sq, v)
+#define MARK_SHIM___(type, qual, squal, var) \
+static inline void mark_##var(type QUAL_##qual x) { \
+	MARK_TYPE(type,squal)(x); \
+}
+
+#define MARK_SHIMS(all, def) MARK_SHIMS_ def
+#define MARK_SHIMS_(type, qual, vars) \
+	DEFER(EACH_INDIRECT)()(MARK_SHIM,(),(type, qual),LITERAL vars)
+
+static void MARK_TYPE(bool,       )(bool x)        {}
+static void MARK_TYPE(bool,      p)(bool *x)       {}
+static void MARK_TYPE(double,     )(double x)      {}
+static void MARK_TYPE(int64_t,    )(int64_t x)     {}
+static void MARK_TYPE(cell_type_t,)(cell_type_t x) {}
+
+static void MARK_TYPE(cell_t,p)(cell_t *x) {
+}
+
+static void MARK_TYPE(cell_t,pp)(cell_t **x) {
+	MARK_TYPE(cell_t,p)(*x);
+}
+
+static void MARK_TYPE(env_t,p)(env_t *x) {
+}
+
+static void MARK_TYPE(lambda_t,p)(lambda_t *x) {
+}
+
+EXPAND(EACH(MARK_SHIMS,(),(),EVAL_VARS));
+
+// Mark-and-sweep
+void mem_gc(stack_t *stack) {
+	struct {
+		EXPAND(EACH(PRINT_VARS,(;),(),EVAL_VARS));
+	} evalvars;
+
+	char *data;
+	enum builtin type;
+
+	// Get the root set from the stack
+	data = stack->bottom;
+	while(data < stack->top) {
+		type = *(enum builtin *) data;
+		data += sizeof type;
+
+		// Handle the stack frame variables
+		switch(type) {
+			EXPAND(EACH(HANDLE_STACK_FRAME,(;),(),BUILTINS));
+		}
+
+		// Skip the jmp_buf
+		data += sizeof(jmp_buf);
 	}
 }
 

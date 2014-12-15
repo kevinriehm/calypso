@@ -88,6 +88,12 @@ static struct {
 	{0,NULL}
 };
 
+static struct {
+	gc_type_t type;
+	void *p;
+} *handles; // For non-stack allocations
+static int maxhandles, nhandles;
+
 static arena_t *buddyarenas;
 static bi_free_block_t buddyfree[BUDDY_MAX_EXP];
 
@@ -475,5 +481,30 @@ void mem_gc(stack_t *stack) {
 		// Skip the jmp_buf
 		data += sizeof(jmp_buf);
 	}
+
+	// Mark from the handles' root set
+	for(int i = 0; i < nhandles; i++)
+		markfuncs[handles[i].type](handles[i].p);
+}
+
+uint32_t mem_new_handle(gc_type_t type) {
+	assert(type != GC_TYPE(etc));
+
+	if(nhandles >= maxhandles) {
+		maxhandles = 1.5*(maxhandles + 1);
+		handles = realloc(handles,maxhandles*sizeof *handles);
+		assert(handles);
+	}
+
+	handles[nhandles].type = type;
+	handles[nhandles].p = NULL;
+
+	return nhandles++;
+}
+
+void *mem_set_handle(uint32_t handle, void *p) {
+	assert(handle < nhandles);
+
+	handles[handle].p = p;
 }
 

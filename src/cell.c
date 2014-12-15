@@ -98,10 +98,13 @@ bool cell_is_list(cell_t *cell) {
 }
 
 char *cell_str_intern(char *str, unsigned len) {
+	static uint32_t internedh;
 	static htable_t *interned = NULL;
 
-	if(!interned)
-		interned = htable_cons(0);
+	if(!interned) {
+		internedh = mem_new_handle(GC_TYPE(htable_t));
+		interned = mem_set_handle(internedh,htable_cons(0));
+	}
 
 	return htable_intern(interned,str,len);
 }

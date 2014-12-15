@@ -3,6 +3,10 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
+
+#define INTERN_CONST_STRING(str) \
+	(cell_str_intern(mem_dup((str),strlen((str)) + 1),strlen((str))))
 
 struct env;
 

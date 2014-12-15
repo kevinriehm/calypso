@@ -4,14 +4,24 @@
 #include <string.h>
 
 #include "cell.h"
+#include "mem.h"
 #include "token.h"
 #include "util.h"
+
+static char *str_quote, *str_quasiquote, *str_unquote, *str_unquote_splicing;
 
 static cell_t *wrap(char *first, cell_t *cell) {
 	return cell_cons(
 		cell_cons_t(VAL_SYM,cell_str_intern(first,strlen(first))),
 		cell_cons(cell,NULL)
 	);
+}
+
+void grammar_init() {
+	str_quote = INTERN_CONST_STRING("quote");
+	str_quasiquote = INTERN_CONST_STRING("quasiquote");
+	str_unquote = INTERN_CONST_STRING("unquote");
+	str_unquote_splicing = INTERN_CONST_STRING("unquote-splicing");
 }
 }
 
@@ -43,10 +53,10 @@ s_exp(R) ::= LPAREN s_exp_list(CAR) PERIOD s_exp(CDR) RPAREN. {
 		for(tail = R; tail->cdr; tail = tail->cdr);
 		tail->cdr = CDR;
 	}
-s_exp(R) ::= QUOTE s_exp(S). { R = wrap("quote",S); }
-s_exp(R) ::= BQUOTE s_exp(S). { R = wrap("quasiquote",S); }
-s_exp(R) ::= COMMA s_exp(S). { R = wrap("unquote",S); }
-s_exp(R) ::= COMMA AT s_exp(S). { R = wrap("unquote-splicing",S); }
+s_exp(R) ::= QUOTE s_exp(S). { R = wrap(str_quote,S); }
+s_exp(R) ::= BQUOTE s_exp(S). { R = wrap(str_quasiquote,S); }
+s_exp(R) ::= COMMA s_exp(S). { R = wrap(str_unquote,S); }
+s_exp(R) ::= COMMA AT s_exp(S). { R = wrap(str_unquote_splicing,S); }
 
 s_exp_list(R) ::= . { R = NULL; }
 s_exp_list(R) ::= s_exp(S) s_exp_list(L). { R = cell_cons(S,L); }

@@ -12,6 +12,8 @@ typedef struct string {
 	unsigned cap, len;
 } string_t;
 
+void grammar_init();
+
 void str_init(string_t *str) {
 	str->s = NULL;
 	str->cap = 0;
@@ -36,6 +38,8 @@ int main(int argc, char **argv) {
 	globals = env_cons(NULL);
 
 	builtin_init(globals);
+
+	grammar_init();
 
 	if(argc > 1) {
 		for(i = 1; i < argc; i++) {

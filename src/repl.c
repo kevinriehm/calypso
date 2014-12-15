@@ -186,6 +186,8 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 		goto fcn; \
 	STACK_FREE(stack,jmp_buf); \
 \
+	mem_gc(&stack); \
+\
 	LOAD(FUNCTION); \
 	STACK_FREE(stack,enum builtin); \
 } while(0)

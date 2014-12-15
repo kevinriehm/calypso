@@ -8,12 +8,6 @@
 #include "htable.h"
 #include "mem.h"
 
-struct env {
-	struct env *parent;
-
-	htable_t *tab;
-};
-
 env_t *env_cons(env_t *parent) {
 	env_t *env;
 
@@ -60,6 +54,9 @@ void env_set(env_t *env, char *sym, cell_t *val, bool local) {
 			env = localenv;
 	}
 
-	htable_insert(env->tab,&sym,sizeof sym,(hvalue_t) { .p = val });
+	htable_insert(env->tab,&sym,sizeof sym,(hvalue_t) {
+		.type = GC_TYPE(cell_t),
+		.p = val
+	});
 }
 

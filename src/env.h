@@ -3,7 +3,11 @@
 
 #include <stdbool.h>
 
-typedef struct env env_t;
+typedef struct env {
+	struct env *parent;
+
+	struct htable *tab;
+} env_t;
 
 env_t *env_cons(env_t *);
 

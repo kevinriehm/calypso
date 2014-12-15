@@ -17,23 +17,6 @@
 
 #define HASH(key, keylen, cap) (murmur3_32(HASH_SEED,(key),(keylen))%(cap))
 
-typedef struct hentry {
-	void *key;
-	uint32_t keylen;
-
-	hvalue_t val;
-
-	struct hentry *next;
-} hentry_t;
-
-struct htable {
-	uint32_t cap;
-	uint32_t mincap;
-
-	uint32_t nentries;
-	hentry_t **entries;
-};
-
 static uint32_t murmur3_32(uint32_t seed, void *key, size_t keylen) {
 	static const uint32_t r1 = 15, r2 = 13;
 	static const uint32_t m = 5, n = 0xe6546b64;
@@ -201,7 +184,10 @@ char *htable_intern(htable_t *tab, void *key, size_t keylen) {
 				&& memcmp(key,entry->key,keylen) == 0)
 				return entry->key;
 
-		htable_insert(tab,key,keylen,(hvalue_t) { .p = NULL });
+		htable_insert(tab,key,keylen,(hvalue_t) {
+			.type = GC_TYPE(etc),
+			.p = NULL
+		});
 	}
 }
 

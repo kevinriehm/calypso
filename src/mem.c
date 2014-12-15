@@ -9,6 +9,8 @@
 
 #include "cell.h"
 #include "env.h"
+#include "htable.h"
+#include "mem.h"
 #include "repl.h"
 #include "stack.h"
 #include "util.h"
@@ -23,7 +25,9 @@
 #define BUDDY_META_BYTES 1
 #define BUDDY_SIZE_MASK  0x0f
 #define BUDDY_ALLOC_BIT  0x10
-#define BUDDY_GC_MASK    0xc0
+#define BUDDY_GC_MASK    (BUDDY_GC1 | BUDDY_GC2)
+#define BUDDY_GC1        0x40
+#define BUDDY_GC2        0x80
 
 static_assert((BUDDY_MAX_EXP - BUDDY_MIN_EXP&BUDDY_SIZE_MASK)
 	== BUDDY_MAX_EXP - BUDDY_MIN_EXP,"BUDDY_SIZE_MASK too narrow");
@@ -37,8 +41,16 @@ static_assert((BUDDY_MAX_EXP - BUDDY_MIN_EXP&BUDDY_SIZE_MASK)
 
 #define ARENA_NEW       0x00000004ul
 
-#define BUDDY_FLAGSP(arena, p) ((uint8_t *) \
-	(arena->data + ((char *) (p) - arena->blocks)/BUDDY_MIN_ALLOC))
+// For large-alloc arenas
+#define ARENA_GC_MASK   (ARENA_GC1 | ARENA_GC2)
+#define ARENA_GC1       0x00000008ul
+#define ARENA_GC2       0x00000010ul
+
+#define GC_USE_GROWTH 1.5
+
+#define BUDDY_FLAGSP(arena, p) \
+	((uint8_t *) ((arena)->data + BUDDY_META_BYTES \
+		*((char *) (p) - (arena)->blocks)/BUDDY_MIN_ALLOC))
 
 typedef struct free_block {
 	struct free_block *next;
@@ -49,25 +61,48 @@ typedef struct bi_free_block {
 } bi_free_block_t;
 
 static_assert(sizeof(bi_free_block_t) <= 1 << BUDDY_MIN_EXP,
-	"BUDDY_MIN_EXP too small");
+	"BUDDY_MIN_EXP too small for bi_free_block_t");
 
 typedef struct arena {
 	struct arena *next;
 
 	size_t size;
 	uint32_t flags;
+	char *blocks;
 
-	union {
-		free_block_t *freelist;
-		char *blocks;
-	};
+	size_t allocd;
+	free_block_t *freelist;
 
 	char data[];
 } arena_t;
 
+typedef void (*mark_func_t)(void *);
+
+static struct {
+	const size_t size;
+	arena_t *arenas;
+} fixedarenas[] = {
+	{8,NULL},
+	{16,NULL},
+	{32,NULL},
+	{0,NULL}
+};
+
+static arena_t *buddyarenas;
 static bi_free_block_t buddyfree[BUDDY_MAX_EXP];
 
+static arena_t *largearenas;
+
+static int64_t heapsize = 0;      // Total of all arenas
+static int64_t heapallocd = 0;    // Total of all allocs - frees
+static int64_t heapused = 100000; // Updated each mem_gc()
+
+static mark_func_t markfuncs[];
+
+static bool gccolor = true; // Value of an unmarked object
+
 static arena_t *alloc_arena() {
+	heapsize += ARENA_SIZE;
 	return aligned_alloc(ARENA_SIZE,ARENA_SIZE);
 }
 
@@ -83,12 +118,13 @@ static void *fixed_alloc(arena_t **arenas, size_t size) {
 		align = size;
 	else align = alignof(max_align_t);
 
-	// Search the existing arenas first
+	// Search the existing fixed-sized arenas first
 	for(arena = *arenas; arena && !arena->freelist; arena = arena->next);
 
 	// Did we find one?
 	if(arena) {
 		p = arena->freelist;
+
 		if(arena->flags & ARENA_NEW) {
 			arena->freelist = (free_block_t *) 
 				((char *) arena->freelist + size);
@@ -98,6 +134,9 @@ static void *fixed_alloc(arena_t **arenas, size_t size) {
 				arena->flags &= ~ARENA_NEW;
 			}
 		} else arena->freelist = arena->freelist->next;
+
+		heapallocd += arena->size;
+		arena->allocd += arena->size;
 		return p;
 	}
 
@@ -106,10 +145,13 @@ static void *fixed_alloc(arena_t **arenas, size_t size) {
 	arena->next = *arenas;
 	arena->size = size;
 	arena->flags = ARENA_FIXED | ARENA_NEW;
+	arena->allocd = 0;
 
 	nblocks = (ARENA_SIZE - offsetof(arena_t,data))/(size + (float) 2/8);
 	blocksoff = (offsetof(arena_t,data) + (nblocks*2 + 7)/8 + align - 1)
 		&~(align - 1);
+
+	arena->blocks = (char *) arena + blocksoff;
 
 	debug("new fixed-size allocation arena:"
 	    "\n\tbase address: %p"
@@ -124,61 +166,74 @@ static void *fixed_alloc(arena_t **arenas, size_t size) {
 	((free_block_t *) ((char *) arena + blocksoff + (nblocks - 1)*size))
 		->next = NULL;
 
-	arena->freelist = (free_block_t *) ((char *) arena + blocksoff + size);
+	arena->freelist = (free_block_t *) (arena->blocks + size);
 
 	*arenas = arena;
 
-	return (char *) arena + blocksoff;
+	heapallocd += arena->size;
+	arena->allocd = arena->size;
+
+	return arena->blocks;
 }
 
-static void fixed_free(arena_t *arena, void *p) {
-	assert((arena->flags&ARENA_TYPE_MASK) == ARENA_FIXED);
+static void buddy_add_free_block(arena_t *arena, void *block, int sizeexp) {
+	bi_free_block_t *_block = block;
 
-	((free_block_t *) p)->next = arena->freelist;
-	arena->freelist = p;
+	if(_block->next = buddyfree[sizeexp].next)
+		_block->next->prev = _block;
+
+	_block->prev = buddyfree + sizeexp;
+	buddyfree[sizeexp].next = _block;
+
+	arena->allocd -= 1 << sizeexp;
+	heapallocd -= 1 << sizeexp;
+}
+
+static void buddy_claim_free_block(arena_t *arena, void *block, int sizeexp) {
+	bi_free_block_t *_block = block;
+
+	if(_block->prev->next = _block->next)
+		_block->next->prev = _block->prev;
+
+	arena->allocd += 1 << sizeexp;
+	heapallocd += 1 << sizeexp;
 }
 
 static void buddy_split_block(arena_t *arena, void *block, int sizeexp) {
-	uint8_t *flags;
 	bi_free_block_t *right;
+
+	assert(sizeexp > BUDDY_MIN_EXP);
 
 	right = (bi_free_block_t *) ((char *) block + (1 << sizeexp - 1));
 
 	// Add right to the free list
-	if(right->next = buddyfree[sizeexp - 1].next)
-		right->next->prev = right;
-	right->prev = buddyfree + sizeexp - 1;
-	buddyfree[sizeexp - 1].next = right;
+	buddy_add_free_block(arena,right,sizeexp - 1);
 
 	// Set right's flags
-	flags = BUDDY_FLAGSP(arena,right);
-	*flags = *flags&BUDDY_GC_MASK | sizeexp - 1 - BUDDY_MIN_EXP;
+	*BUDDY_FLAGSP(arena,right) = sizeexp - 1 - BUDDY_MIN_EXP;
 }
 
 static void *buddy_check_free_lists(int sizeexp) {
 	arena_t *arena;
-	uint8_t *flags;
 	bi_free_block_t *block;
 
 	for(int i = sizeexp; i < BUDDY_MAX_EXP; i++) {
 		// Do we have a free one?
 		if(block = buddyfree[i].next) {
-			// Claim it
-			if(buddyfree[i].next = block->next)
-				buddyfree[i].next->prev = buddyfree  + i;
-
 			// In what arena?
 			arena = (arena_t *)
 				((uintptr_t) block&~(ARENA_SIZE - 1));
+
+			// Claim it
+			buddy_claim_free_block(arena,block,i);
 
 			// Split it, as needed
 			while(i > sizeexp)
 				buddy_split_block(arena,block,i--);
 
 			// Mark it as taken
-			flags = BUDDY_FLAGSP(arena,block);
-			*flags = *flags&BUDDY_GC_MASK | BUDDY_ALLOC_BIT
-				| i - BUDDY_MIN_EXP;
+			*BUDDY_FLAGSP(arena,block) = gccolor*BUDDY_GC1
+				| BUDDY_ALLOC_BIT | i - BUDDY_MIN_EXP;
 
 			return block;
 		}
@@ -218,8 +273,11 @@ static void *buddy_alloc(arena_t **arenas, size_t size) {
 		/(BUDDY_MIN_ALLOC + BUDDY_META_BYTES);
 	headsize = offsetof(arena_t,data) + nblocks*BUDDY_META_BYTES;
 	headsize = 1 << (int) ceil(log2(headsize));
+	nblocks = (ARENA_SIZE - headsize)/BUDDY_MIN_ALLOC;
 
 	arena->blocks = (char *) arena + headsize;
+	arena->allocd = ARENA_SIZE - (arena->blocks - (char *) arena);
+	heapallocd += arena->allocd;
 
 	debug("new buddy-allocation arena:"
 	    "\n\tbase address:    %p"
@@ -285,26 +343,17 @@ static void *large_free(arena_t *arena, void *p) {
 }
 
 void *mem_alloc(size_t size) {
-	static struct {
-		const size_t size;
-		arena_t *arenas;
-	} arenas[] = {
-		{8,NULL},
-		{16,NULL},
-		{32,NULL},
-		{0,NULL} // Small < size < ARENA_MAX_ALLOC
-	};
-
 	int i;
 
 	// Small objects have their own arenas
-	for(i = 0; arenas[i].size; i++)
-		if(size <= arenas[i].size)
-			return fixed_alloc(&arenas[i].arenas,arenas[i].size);
+	for(i = 0; fixedarenas[i].size; i++)
+		if(size <= fixedarenas[i].size)
+			return fixed_alloc(&fixedarenas[i].arenas,
+				fixedarenas[i].size);
 
 	// Medium objects use the buddy system
 	if(size < BUDDY_MAX_ALLOC)
-		return buddy_alloc(&arenas[i].arenas,size);
+		return buddy_alloc(&buddyarenas,size);
 
 	// Large objects get their own arenas
 	return large_alloc(size);
@@ -394,9 +443,25 @@ void mem_gc(stack_t *stack) {
 	} evalvars;
 
 	char *data;
+	arena_t **arena;
 	enum builtin type;
+	int64_t oldheapsize, oldheapallocd;
 
-	// Get the root set from the stack
+	// Only do this if we need to
+	if(heapallocd < GC_USE_GROWTH*heapused)
+		return;
+
+	debug("garbage collection (pre-cycle):"
+	    "\n\theap size: %lli"
+	    "\n\tallocated: %lli",
+		(long long) heapsize,(long long) heapallocd);
+	oldheapsize = heapsize;
+	oldheapallocd = heapallocd;
+
+	// Invert the meaning of all the GC bits
+	gccolor = !gccolor;
+
+	// Mark from the stack's root set
 	data = stack->bottom;
 	while(data < stack->top) {
 		type = *(enum builtin *) data;

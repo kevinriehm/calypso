@@ -4,6 +4,7 @@
 
 #include "cell.h"
 #include "env.h"
+#include "mem.h"
 #include "repl.h"
 #include "util.h"
 
@@ -34,8 +35,10 @@ int main(int argc, char **argv) {
 	int i;
 	FILE *in;
 	env_t *globals;
+	uint32_t globalsh;
 
-	globals = env_cons(NULL);
+	globalsh = mem_new_handle(GC_TYPE(env_t));
+	globals = mem_set_handle(globalsh,env_cons(NULL));
 
 	builtin_init(globals);
 

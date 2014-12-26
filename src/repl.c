@@ -108,12 +108,6 @@ bool readf(void *p, stream_t *s, cell_t **cell) {
 	return *cell != &sentinel;
 }
 
-static void bind_args(env_t *env, env_t *envout, cell_t *template,
-	cell_t *args, bool macro) {
-	cell_t *head, **tail;
-
-}
-
 void grow_stack(stack_t *stack, size_t nbytes) {
 	char *newstack;
 	size_t newsize;
@@ -201,7 +195,7 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 	retval = (_val); \
 \
 	if(stack.top == stack.bottom) \
-		return retval; \
+		goto done; \
 \
 	longjmp(*STACK_TOP(stack,jmp_buf),1); \
 } while(0)
@@ -264,6 +258,8 @@ cell_t *eval(env_t *_env, cell_t *_sexp) {
 		.bottom = NULL
 	};
 
+	static uint32_t retvalh = ~(uint32_t) 0;
+
 	EXPAND(EACH(PRINT_VARS,(;),(),EVAL_VARS));
 
 	char *str;
@@ -279,6 +275,11 @@ cell_t *eval(env_t *_env, cell_t *_sexp) {
 	if(!stack.bottom)
 		stack.bottom = malloc(stack.size*sizeof *stack.bottom);
 	stack.top = stack.bottom;
+
+	// Register retval with the garbage collector
+	if(retvalh == ~(uint32_t) 0)
+		retvalh = mem_new_handle(GC_TYPE_INDIRECT(cell_t));
+	mem_set_handle(retvalh,(void *) &retval);
 
 #undef FUNCTION
 #define FUNCTION eval
@@ -309,27 +310,26 @@ LABEL
 		if(cell_type(op) == VAL_FCN) {
 			sexp = sexp->cdr;
 			switch(op->fcn) {
-			case FCN_APPEND:     JMP_APPEND(env,sexp);     break;
-			case FCN_ATOM:       JMP_ATOM(env,sexp);       break;
-			case FCN_CAR:        JMP_CAR(env,sexp);        break;
-			case FCN_CDR:        JMP_CDR(env,sexp);        break;
-			case FCN_COND:       JMP_COND(env,sexp);       break;
-			case FCN_CONS:       JMP_CONS(env,sexp);       break;
-			case FCN_EQ:         JMP_EQ(env,sexp);         break;
-			case FCN_EVAL:       JMP_EVAL(env,sexp);       break;
-			case FCN_GENSYM:     JMP_GENSYM(env,sexp);     break;
-			case FCN_LAMBDA:     JMP_LAMBDA(env,sexp);     break;
-			case FCN_MACRO:      JMP_MACRO(env,sexp);      break;
-			case FCN_MACROEXPAND:
-				JMP_MACROEXPAND(env,sexp);             break;
+			case FCN_APPEND:      JMP_APPEND(env,sexp);      break;
+			case FCN_ATOM:        JMP_ATOM(env,sexp);        break;
+			case FCN_CAR:         JMP_CAR(env,sexp);         break;
+			case FCN_CDR:         JMP_CDR(env,sexp);         break;
+			case FCN_COND:        JMP_COND(env,sexp);        break;
+			case FCN_CONS:        JMP_CONS(env,sexp);        break;
+			case FCN_EQ:          JMP_EQ(env,sexp);          break;
+			case FCN_EVAL:        JMP_EVAL(env,sexp);        break;
+			case FCN_GENSYM:      JMP_GENSYM(env,sexp);      break;
+			case FCN_LAMBDA:      JMP_LAMBDA(env,sexp);      break;
+			case FCN_MACRO:       JMP_MACRO(env,sexp);       break;
+			case FCN_MACROEXPAND: JMP_MACROEXPAND(env,sexp); break;
 			case FCN_MACROEXPAND_1:
-				JMP_MACROEXPAND_1(env,sexp);           break;
-			case FCN_PRINT:      JMP_PRINT(env,sexp);      break;
-			case FCN_QUASIQUOTE: JMP_QUASIQUOTE(env,sexp); break;
-			case FCN_QUOTE:      JMP_QUOTE(env,sexp);      break;
-			case FCN_ASSIGN:     JMP_ASSIGN(env,sexp);     break;
-			case FCN_ADD:        JMP_ADD(env,sexp);        break;
-			case FCN_SUB:        JMP_SUB(env,sexp);        break;
+				JMP_MACROEXPAND_1(env,sexp); break;
+			case FCN_PRINT:       JMP_PRINT(env,sexp);       break;
+			case FCN_QUASIQUOTE:  JMP_QUASIQUOTE(env,sexp);  break;
+			case FCN_QUOTE:       JMP_QUOTE(env,sexp);       break;
+			case FCN_ASSIGN:      JMP_ASSIGN(env,sexp);      break;
+			case FCN_ADD:         JMP_ADD(env,sexp);         break;
+			case FCN_SUB:         JMP_SUB(env,sexp);         break;
 			}
 
 			check(false,"unhandled function type");
@@ -767,6 +767,12 @@ sub_x:
 	case VAL_I64: RETURN(cell_cons_t(VAL_I64,i64));
 	case VAL_DBL: RETURN(cell_cons_t(VAL_DBL,dbl));
 	}
+
+// Cleanup when actually returning
+done:
+	mem_set_handle(retvalh,NULL);
+
+	return retval;
 }
 
 void print(cell_t *sexp) {

@@ -16,6 +16,21 @@
 #include "util.h"
 #include "va_macro.h"
 
+#define GC_NUM_BITS   2
+#define GC_USE_GROWTH 100
+
+#define GC_COLOR(bit0, bit1, flags) ((flags) & ((bit0) | (bit1)))
+#define GC_FREE                     0
+#define GC_WHITE(bit0, bit1)        (gcinvert ? (bit0) : (bit1))
+#define GC_BLACK(bit0, bit1)        (gcinvert ? (bit1) : (bit0))
+
+#define FIXED_GC_MASK(i) (3 << (i))
+
+#define FIXED_GC_COLOR(flags, i) GC_COLOR(1 << (i),2 << (i),(flags))
+#define FIXED_GC_FREE            GC_FREE
+#define FIXED_GC_WHITE(i)        GC_WHITE(1 << (i),2 << (i))
+#define FIXED_GC_BLACK(i)        GC_BLACK(1 << (i),2 << (i))
+
 #define BUDDY_MIN_EXP 6
 #define BUDDY_MAX_EXP 20
 
@@ -24,10 +39,14 @@
 
 #define BUDDY_META_BYTES 1
 #define BUDDY_SIZE_MASK  0x0f
-#define BUDDY_ALLOC_BIT  0x10
 #define BUDDY_GC_MASK    (BUDDY_GC1 | BUDDY_GC2)
 #define BUDDY_GC1        0x40
 #define BUDDY_GC2        0x80
+
+#define BUDDY_GC_COLOR(flags) GC_COLOR(BUDDY_GC1,BUDDY_GC2,(flags))
+#define BUDDY_GC_FREE         GC_FREE
+#define BUDDY_GC_WHITE        GC_WHITE(BUDDY_GC1,BUDDY_GC2)
+#define BUDDY_GC_BLACK        GC_BLACK(BUDDY_GC1,BUDDY_GC2)
 
 static_assert((BUDDY_MAX_EXP - BUDDY_MIN_EXP&BUDDY_SIZE_MASK)
 	== BUDDY_MAX_EXP - BUDDY_MIN_EXP,"BUDDY_SIZE_MASK too narrow");
@@ -46,7 +65,10 @@ static_assert((BUDDY_MAX_EXP - BUDDY_MIN_EXP&BUDDY_SIZE_MASK)
 #define ARENA_GC1       0x00000008ul
 #define ARENA_GC2       0x00000010ul
 
-#define GC_USE_GROWTH 1.5
+#define ARENA_GC_COLOR(flags) GC_COLOR(ARENA_GC1,ARENA_GC2,(flags))
+#define ARENA_GC_FREE         GC_FREE
+#define ARENA_GC_WHITE        GC_WHITE(ARENA_GC1,ARENA_GC2)
+#define ARENA_GC_BLACK        GC_BLACK(ARENA_GC1,ARENA_GC2)
 
 #define BUDDY_FLAGSP(arena, p) \
 	((uint8_t *) ((arena)->data + BUDDY_META_BYTES \
@@ -60,7 +82,7 @@ typedef struct bi_free_block {
 	struct bi_free_block *next, *prev;
 } bi_free_block_t;
 
-static_assert(sizeof(bi_free_block_t) <= 1 << BUDDY_MIN_EXP,
+static_assert(sizeof(bi_free_block_t) <= BUDDY_MIN_ALLOC,
 	"BUDDY_MIN_EXP too small for bi_free_block_t");
 
 typedef struct arena {
@@ -70,7 +92,6 @@ typedef struct arena {
 	uint32_t flags;
 	char *blocks;
 
-	size_t allocd;
 	free_block_t *freelist;
 
 	char data[];
@@ -105,7 +126,7 @@ static int64_t heapused = 100000; // Updated each mem_gc()
 
 static mark_func_t markfuncs[];
 
-static bool gccolor = true; // Value of an unmarked object
+static bool gcinvert = true; // Swaps the meaning of white and black GC bits
 
 static arena_t *alloc_arena() {
 	heapsize += ARENA_SIZE;
@@ -114,15 +135,13 @@ static arena_t *alloc_arena() {
 
 static void *fixed_alloc(arena_t **arenas, size_t size) {
 	void *p;
+	int gcbitsi;
 	arena_t *arena;
+	uint8_t *flagsp;
 	size_t align, blocksoff, nblocks;
 
 	assert(size != 0 && !(size & size - 1));
 	assert(size >= sizeof(free_block_t));
-
-	if(size < alignof(max_align_t))
-		align = size;
-	else align = alignof(max_align_t);
 
 	// Search the existing fixed-sized arenas first
 	for(arena = *arenas; arena && !arena->freelist; arena = arena->next);
@@ -131,7 +150,13 @@ static void *fixed_alloc(arena_t **arenas, size_t size) {
 	if(arena) {
 		p = arena->freelist;
 
-		if(arena->flags & ARENA_NEW) {
+		// Set the flags
+		gcbitsi = GC_NUM_BITS*((char *) p - arena->blocks)/arena->size;
+		flagsp = arena->data + gcbitsi/8;
+		*flagsp = *flagsp&~FIXED_GC_MASK(gcbitsi%8)
+			| FIXED_GC_BLACK(gcbitsi%8);
+
+		if(arena->flags&ARENA_NEW) {
 			arena->freelist = (free_block_t *) 
 				((char *) arena->freelist + size);
 			if((char *) arena + ARENA_SIZE
@@ -142,7 +167,7 @@ static void *fixed_alloc(arena_t **arenas, size_t size) {
 		} else arena->freelist = arena->freelist->next;
 
 		heapallocd += arena->size;
-		arena->allocd += arena->size;
+
 		return p;
 	}
 
@@ -151,7 +176,10 @@ static void *fixed_alloc(arena_t **arenas, size_t size) {
 	arena->next = *arenas;
 	arena->size = size;
 	arena->flags = ARENA_FIXED | ARENA_NEW;
-	arena->allocd = 0;
+
+	if(size < alignof(max_align_t))
+		align = size;
+	else align = alignof(max_align_t);
 
 	nblocks = (ARENA_SIZE - offsetof(arena_t,data))/(size + (float) 2/8);
 	blocksoff = (offsetof(arena_t,data) + (nblocks*2 + 7)/8 + align - 1)
@@ -176,8 +204,11 @@ static void *fixed_alloc(arena_t **arenas, size_t size) {
 
 	*arenas = arena;
 
+	// Set the flags
+	flagsp = arena->data;
+	*flagsp = *flagsp&~FIXED_GC_MASK(0) | FIXED_GC_BLACK(0);
+
 	heapallocd += arena->size;
-	arena->allocd = arena->size;
 
 	return arena->blocks;
 }
@@ -190,9 +221,6 @@ static void buddy_add_free_block(arena_t *arena, void *block, int sizeexp) {
 
 	_block->prev = buddyfree + sizeexp;
 	buddyfree[sizeexp].next = _block;
-
-	arena->allocd -= 1 << sizeexp;
-	heapallocd -= 1 << sizeexp;
 }
 
 static void buddy_claim_free_block(arena_t *arena, void *block, int sizeexp) {
@@ -200,9 +228,6 @@ static void buddy_claim_free_block(arena_t *arena, void *block, int sizeexp) {
 
 	if(_block->prev->next = _block->next)
 		_block->next->prev = _block->prev;
-
-	arena->allocd += 1 << sizeexp;
-	heapallocd += 1 << sizeexp;
 }
 
 static void buddy_split_block(arena_t *arena, void *block, int sizeexp) {
@@ -216,7 +241,8 @@ static void buddy_split_block(arena_t *arena, void *block, int sizeexp) {
 	buddy_add_free_block(arena,right,sizeexp - 1);
 
 	// Set right's flags
-	*BUDDY_FLAGSP(arena,right) = sizeexp - 1 - BUDDY_MIN_EXP;
+	*BUDDY_FLAGSP(arena,right) = BUDDY_GC_FREE
+		| sizeexp - 1 - BUDDY_MIN_EXP;
 }
 
 static void *buddy_check_free_lists(int sizeexp) {
@@ -238,8 +264,10 @@ static void *buddy_check_free_lists(int sizeexp) {
 				buddy_split_block(arena,block,i--);
 
 			// Mark it as taken
-			*BUDDY_FLAGSP(arena,block) = gccolor*BUDDY_GC1
-				| BUDDY_ALLOC_BIT | i - BUDDY_MIN_EXP;
+			*BUDDY_FLAGSP(arena,block) = BUDDY_GC_BLACK
+				| i - BUDDY_MIN_EXP;
+
+			heapallocd += 1 << sizeexp;
 
 			return block;
 		}
@@ -282,8 +310,6 @@ static void *buddy_alloc(arena_t **arenas, size_t size) {
 	nblocks = (ARENA_SIZE - headsize)/BUDDY_MIN_ALLOC;
 
 	arena->blocks = (char *) arena + headsize;
-	arena->allocd = ARENA_SIZE - (arena->blocks - (char *) arena);
-	heapallocd += arena->allocd;
 
 	debug("new buddy-allocation arena:"
 	    "\n\tbase address:    %p"
@@ -291,7 +317,7 @@ static void *buddy_alloc(arena_t **arenas, size_t size) {
 	    "\n\tmin chunk size:  %i"
 	    "\n\tmin chunk count: %i"
 	    "\n\toverhead:        %i (%.2f%%)",
-		arena,(int) ARENA_SIZE,(int) 1 << BUDDY_MIN_EXP,(int) nblocks,
+		arena,(int) ARENA_SIZE,(int) BUDDY_MIN_ALLOC,(int) nblocks,
 		(int) headsize,100.*headsize/ARENA_SIZE);
 
 	// Split up the new arena for the header
@@ -304,48 +330,23 @@ static void *buddy_alloc(arena_t **arenas, size_t size) {
 	return buddy_check_free_lists(sizei);
 }
 
-static void buddy_free(arena_t *arena, void *p) {
-	assert((arena->flags&ARENA_TYPE_MASK) == ARENA_BUDDY);
-
-	int sizeexp;
-	void *buddy;
-	uint8_t *bflags, *pflags;
-
-	pflags = BUDDY_FLAGSP(arena,p);
-	sizeexp = BUDDY_MIN_EXP + (*pflags&BUDDY_SIZE_MASK);
-
-	while(true) {
-		buddy = (void *) ((uintptr_t) p ^ 1 << sizeexp);
-		bflags = BUDDY_FLAGSP(arena,buddy);
-
-		if(*bflags&BUDDY_ALLOC_BIT)
-			break;
-
-		sizeexp++;
-
-		if(buddy < p) {
-			p = buddy;
-			pflags = bflags;
-		}
-	}
-
-	*pflags = (*pflags&BUDDY_GC_MASK) | sizeexp - BUDDY_MIN_EXP;
-}
-
 static void *large_alloc(size_t size) {
-	size_t align;
 	arena_t *arena;
+	size_t align, headsize;
 
 	align = alignof(max_align_t);
-	size += (offsetof(arena_t,data) + align - 1)&~(align - 1);
-	if(posix_memalign((void **) &arena,ARENA_SIZE,size))
-		die("cannot allocate %lli bytes",(long long) size);
-	arena->flags = ARENA_LARGE;
-	return (void *) ((uintptr_t) (arena->data + align - 1)&~(align - 1));
-}
+	headsize = (offsetof(arena_t,data) + align - 1)&~(align - 1);
 
-static void *large_free(arena_t *arena, void *p) {
-	free(arena);
+	if(posix_memalign((void **) &arena,ARENA_SIZE,size + headsize))
+		die("cannot allocate %lli bytes",(long long) size);
+	arena->size = size;
+	arena->flags = ARENA_LARGE | ARENA_GC_WHITE;
+	arena->blocks = (char *) arena + headsize;
+
+	heapsize += headsize + size;
+	heapallocd += size;
+
+	return (void *) ((uintptr_t) (arena->data + align - 1)&~(align - 1));
 }
 
 void *mem_alloc(size_t size) {
@@ -363,22 +364,6 @@ void *mem_alloc(size_t size) {
 
 	// Large objects get their own arenas
 	return large_alloc(size);
-}
-
-void mem_free(void *p) {
-	if(!p) return;
-
-	arena_t *arena;
-
-	arena = (arena_t *) ((uintptr_t) p&~(ARENA_SIZE - 1));
-	switch(arena->flags&ARENA_TYPE_MASK) {
-	case ARENA_FIXED: fixed_free(arena,p); break;
-	case ARENA_BUDDY: buddy_free(arena,p); break;
-	case ARENA_LARGE: large_free(arena,p); break;
-
-	default: die("unhandled arena type in mem_free(): 0x%08lu",
-		arena->flags&ARENA_TYPE_MASK);
-	}
 }
 
 void *mem_dup(void *p, size_t n) {
@@ -421,26 +406,267 @@ static inline void mark_##var(type QUAL_##qual x) { \
 #define MARK_SHIMS_(type, qual, vars) \
 	DEFER(EACH_INDIRECT)()(MARK_SHIM,(),(type, qual),LITERAL vars)
 
+// These are assumed not to be allocated with mem_alloc()
 static void MARK_TYPE(bool,       )(bool x)        {}
 static void MARK_TYPE(bool,      p)(bool *x)       {}
 static void MARK_TYPE(double,     )(double x)      {}
 static void MARK_TYPE(int64_t,    )(int64_t x)     {}
 static void MARK_TYPE(cell_type_t,)(cell_type_t x) {}
 
-static void MARK_TYPE(cell_t,p)(cell_t *x) {
+// These are assumed to be allocated with mem_alloc()
+
+// Forward declarations
+#define DECLARE_MARK_GC_TYPE(all, type) \
+static void MARK_TYPE(type,p)(type *)
+
+EACH(DECLARE_MARK_GC_TYPE,(;),(),GC_TYPES);
+
+#define DECLARE_MARK_GC_TYPE_INDIRECT(all, type) \
+static void MARK_TYPE(type,pp)(type **x) { \
+	if(x) MARK_TYPE(type,p)(*x); \
 }
 
-static void MARK_TYPE(cell_t,pp)(cell_t **x) {
-	MARK_TYPE(cell_t,p)(*x);
+EACH(DECLARE_MARK_GC_TYPE_INDIRECT,(),(),GC_TYPES)
+
+static void MARK_TYPE(lambda_t,)(lambda_t x) {
+	MARK_TYPE(env_t,p)(x.env);
+	MARK_TYPE(cell_t,p)(x.args);
+	MARK_TYPE(cell_t,p)(x.body);
+}
+
+// Returns whether p was already marked
+static bool mark_ptr(void *p) {
+	int gcbitsi;
+	bool marked;
+	size_t size;
+	arena_t *arena;
+	uint8_t *flagsp;
+
+	// Sanity check
+	if(!p) return true;
+
+	arena = (arena_t *) ((uintptr_t) p&~(ARENA_SIZE - 1));
+
+	// What kind of arena?
+	switch(arena->flags&ARENA_TYPE_MASK) {
+	case ARENA_FIXED:
+		// Fixed GC bits are all packed together
+		gcbitsi = GC_NUM_BITS*((char *) p - arena->blocks)/arena->size;
+		flagsp = arena->data + gcbitsi/8;
+		marked = FIXED_GC_COLOR(*flagsp,gcbitsi%8)
+			== FIXED_GC_BLACK(gcbitsi%8);
+		*flagsp = *flagsp&~FIXED_GC_MASK(gcbitsi%8)
+			| FIXED_GC_BLACK(gcbitsi%8);
+
+		size = arena->size;
+		break;
+
+	case ARENA_BUDDY:
+		// Each buddy block gets its own byte for flags
+		flagsp = BUDDY_FLAGSP(arena,p);
+		marked = BUDDY_GC_COLOR(*flagsp) == BUDDY_GC_BLACK;
+		*flagsp = *flagsp&~BUDDY_GC_MASK | BUDDY_GC_BLACK;
+
+		size = 1 << BUDDY_MIN_EXP + (*flagsp&BUDDY_SIZE_MASK);
+		break;
+
+	case ARENA_LARGE:
+		// Large arenas are individual allocations
+		marked = ARENA_GC_COLOR(arena->flags) == ARENA_GC_BLACK;
+		arena->flags = arena->flags&ARENA_GC_MASK | ARENA_GC_BLACK;
+
+		size = arena->size;
+		break;
+
+	default: die("unhandled arena type in mark_ptr(): 0x%08u",
+		arena->flags&ARENA_TYPE_MASK); break;
+	}
+
+	if(!marked)
+		heapallocd += size;
+
+	return marked;
+}
+
+static void MARK_TYPE(char,p)(char *x) {
+	mark_ptr(x);
+}
+
+static void MARK_TYPE(cell_t,p)(cell_t *x) {
+	if(mark_ptr(x))
+		return;
+
+	switch(cell_type(x)) {
+	case VAL_SYM:
+		MARK_TYPE(char,p)(x->sym);
+		break;
+
+	case VAL_LBA:
+		MARK_TYPE(lambda_t,)(*cell_lba(x));
+		break;
+
+	case VAL_LST:
+		MARK_TYPE(cell_t,p)(x->car);
+		MARK_TYPE(cell_t,p)(x->cdr);
+		break;
+
+	default: break;
+	}
 }
 
 static void MARK_TYPE(env_t,p)(env_t *x) {
+	if(mark_ptr(x))
+		return;
+
+	MARK_TYPE(env_t,p)(x->parent);
+	MARK_TYPE(htable_t,p)(x->tab);
+}
+
+static void MARK_TYPE(hentry_t,p)(hentry_t *x) {
+	for(; x; x = x->next) {
+		if(mark_ptr(x))
+			return;
+
+		MARK_TYPE(void,p)(x->key);
+
+		if(x->val.type != GC_TYPE(etc))
+			markfuncs[x->val.type](x->val.p);
+	}
+}
+
+static void MARK_TYPE(htable_t,p)(htable_t *x) {
+	if(mark_ptr(x))
+		return;
+
+	mark_ptr(x->entries);
+
+	for(int i = 0; i < x->cap; i++)
+		MARK_TYPE(hentry_t,p)(x->entries[i]);
 }
 
 static void MARK_TYPE(lambda_t,p)(lambda_t *x) {
+	if(mark_ptr(x))
+		return;
+
+	MARK_TYPE(lambda_t,)(*x);
+}
+
+static void MARK_TYPE(void,p)(void *p) {
+	mark_ptr(p);
 }
 
 EXPAND(EACH(MARK_SHIMS,(),(),EVAL_VARS));
+
+#define REGISTER_MARK_FUNC(all, type) \
+	[GC_TYPE(type)] = (mark_func_t) MARK_TYPE(type,p), \
+	[GC_TYPE_INDIRECT(type)] = (mark_func_t) MARK_TYPE(type,pp)
+
+static mark_func_t markfuncs[] = {
+	EACH(REGISTER_MARK_FUNC,(,),(),GC_TYPES)
+};
+
+static void clean_fixed_arena(arena_t **arena) {
+	char *flagsp;
+	long gcbitsi, nblocks;
+	free_block_t *freeblock, **freelist;
+
+	// How many blocks to check, and where to put newly freed blocks
+	if((*arena)->flags&ARENA_NEW) {
+		nblocks = ((char *) (*arena)->freelist - (*arena)->blocks)
+			/(*arena)->size;
+		freelist = &((free_block_t *) ((uintptr_t) *arena + ARENA_SIZE
+			- (*arena)->size))->next;
+	} else {
+		nblocks = ((char *) *arena + ARENA_SIZE - (*arena)->blocks)
+			/(*arena)->size;
+		freelist = &(*arena)->freelist;
+	}
+
+	// Check every block
+	for(long i = 0; i < nblocks; i++) {
+		gcbitsi = GC_NUM_BITS*i;
+
+		flagsp = (*arena)->data + gcbitsi/8;
+
+		if(FIXED_GC_COLOR(*flagsp,gcbitsi%8)
+			== FIXED_GC_WHITE(gcbitsi%8)) {
+			freeblock = (free_block_t *)
+				((*arena)->blocks + i*(*arena)->size);
+			freeblock->next = *freelist;
+			*freelist = freeblock;
+
+			*flagsp = *flagsp&~FIXED_GC_MASK(gcbitsi%8)
+				| FIXED_GC_FREE;
+		}
+	}
+}
+
+static void clean_buddy_arena(arena_t **arena) {
+	int sizeexp;
+	char *buddy, *endp, *p;
+	uint8_t *bflagsp, *flagsp;
+
+	// Step through all the blocks
+	endp = (char *) *arena + ARENA_SIZE;
+	for(p = (*arena)->blocks; p < endp; p += 1 << sizeexp) {
+		flagsp = BUDDY_FLAGSP(*arena,p);
+		sizeexp = BUDDY_MIN_EXP + (*flagsp&BUDDY_SIZE_MASK);
+
+		// Only free allocated but unmarked blocks
+		if(BUDDY_GC_COLOR(*flagsp) != BUDDY_GC_WHITE)
+			continue;
+
+		// Merge as many buddies as possible
+		while(true) {
+			buddy = (char *) ((uintptr_t) p ^ 1 << sizeexp);
+
+			// Invalid buddy?
+			if(buddy < (*arena)->blocks)
+				break;
+
+			bflagsp = BUDDY_FLAGSP(*arena,buddy);
+
+			// Buddy not mergable?
+			if(BUDDY_GC_COLOR(*bflagsp) == BUDDY_GC_BLACK
+				|| sizeexp != BUDDY_MIN_EXP
+					+ (*bflagsp&BUDDY_SIZE_MASK))
+				break;
+
+			// Claim it for accounting purposes
+			if(BUDDY_GC_COLOR(*bflagsp) == BUDDY_GC_FREE)
+				buddy_claim_free_block(*arena,buddy,sizeexp);
+
+			sizeexp++;
+
+			if(buddy < p) {
+				p = buddy;
+				flagsp = bflagsp;
+			}
+		}
+
+		// 2^sizeexp bytes at p are free
+		buddy_add_free_block(*arena,p,sizeexp);
+
+		*flagsp = BUDDY_GC_FREE | sizeexp - BUDDY_MIN_EXP;
+	}
+}
+
+static void clean_large_arena(arena_t **arena) {
+	arena_t *next;
+	size_t headsize;
+
+	// Leave it if marked
+	if(ARENA_GC_COLOR((*arena)->flags) == ARENA_GC_BLACK)
+		return;
+
+	// Free the whole arena
+	headsize = (*arena)->blocks - (char *) *arena;
+	heapsize -= headsize + (*arena)->size;
+
+	next = (*arena)->next;
+	free(*arena);
+	*arena = next;
+}
 
 // Mark-and-sweep
 void mem_gc(stack_t *stack) {
@@ -464,8 +690,11 @@ void mem_gc(stack_t *stack) {
 	oldheapsize = heapsize;
 	oldheapallocd = heapallocd;
 
+	// Accounting
+	heapallocd = 0;
+
 	// Invert the meaning of all the GC bits
-	gccolor = !gccolor;
+	gcinvert = !gcinvert;
 
 	// Mark from the stack's root set
 	data = stack->bottom;
@@ -485,6 +714,29 @@ void mem_gc(stack_t *stack) {
 	// Mark from the handles' root set
 	for(int i = 0; i < nhandles; i++)
 		markfuncs[handles[i].type](handles[i].p);
+
+	// Clean out each of the arenas
+	for(int i = 0; fixedarenas[i].arenas; i++)
+		for(arena = &fixedarenas[i].arenas; *arena;
+			*arena ? arena = &(*arena)->next : 0)
+			clean_fixed_arena(arena);
+
+	for(arena = &buddyarenas; *arena; *arena ? arena = &(*arena)->next : 0)
+		clean_buddy_arena(arena);
+
+	for(arena = &largearenas; *arena; *arena ? arena = &(*arena)->next : 0)
+		clean_large_arena(arena);
+
+	heapused = heapallocd;
+	assert(heapused >= 0);
+
+	debug("garbage collection (post-cycle):"
+	    "\n\theap size: %lli (%+.2f%%)"
+	    "\n\tallocated: %lli (%+.2f%%)",
+		(long long) heapsize,
+		100.*(heapsize - oldheapsize)/oldheapsize,
+		(long long) heapallocd,
+		100.*(heapallocd - oldheapallocd)/oldheapallocd);
 }
 
 uint32_t mem_new_handle(gc_type_t type) {

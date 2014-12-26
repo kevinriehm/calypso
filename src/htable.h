@@ -16,12 +16,12 @@ typedef struct hvalue {
 } hvalue_t;
 
 typedef struct hentry {
+	struct hentry *next;
+
 	void *key;
 	uint32_t keylen;
 
 	hvalue_t val;
-
-	struct hentry *next;
 } hentry_t;
 
 typedef struct htable {

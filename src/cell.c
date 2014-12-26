@@ -79,7 +79,9 @@ cell_t *cell_dup(cell_t *cell) {
 cell_type_t cell_type(cell_t *cell) {
 	uintptr_t type;
 
-	return (type = (uintptr_t) cell->car) < NUM_VAL_TYPES ? type : VAL_LST;
+	type = (uintptr_t) cell->car;
+
+	return type != VAL_NIL && type < NUM_VAL_TYPES ? type : VAL_LST;
 }
 
 lambda_t *cell_lba(cell_t *cell) {

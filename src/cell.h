@@ -11,7 +11,7 @@
 struct env;
 
 typedef enum cell_type {
-	VAL_NIL,
+	VAL_NIL, // Also a list
 	VAL_SYM,
 	VAL_I64,
 	VAL_DBL,

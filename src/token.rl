@@ -129,9 +129,6 @@ refill:
 		variable ts  s->ts;
 
 		action escaped_char {
-			static const char *eschars = "\"'?\\abfnrtv";
-			static const char *rechars = "\"'?\\\a\b\f\n\r\t\v";
-
 			switch(fc) {
 			case 'a': fc = '\a'; break;
 			case 'b': fc = '\b'; break;

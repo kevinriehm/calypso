@@ -97,8 +97,6 @@ typedef struct arena {
 	char data[];
 } arena_t;
 
-typedef void (*mark_func_t)(void *);
-
 static struct {
 	const size_t size;
 	arena_t *arenas;
@@ -113,7 +111,7 @@ static struct {
 	gc_type_t type;
 	void *p;
 } *handles; // For non-stack allocations
-static int maxhandles, nhandles;
+static uint32_t maxhandles, nhandles;
 
 static arena_t *buddyarenas;
 static bi_free_block_t buddyfree[BUDDY_MAX_EXP];
@@ -123,8 +121,6 @@ static arena_t *largearenas;
 static int64_t heapsize = 0;      // Total of all arenas
 static int64_t heapallocd = 0;    // Total of all allocs - frees
 static int64_t heapused = 100000; // Updated each mem_gc()
-
-static mark_func_t markfuncs[];
 
 static bool gcinvert = true; // Swaps the meaning of white and black GC bits
 
@@ -152,7 +148,7 @@ static void *fixed_alloc(arena_t **arenas, size_t size) {
 
 		// Set the flags
 		gcbitsi = GC_NUM_BITS*((char *) p - arena->blocks)/arena->size;
-		flagsp = arena->data + gcbitsi/8;
+		flagsp = (uint8_t *) arena->data + gcbitsi/8;
 		*flagsp = *flagsp&~FIXED_GC_MASK(gcbitsi%8)
 			| FIXED_GC_BLACK(gcbitsi%8);
 
@@ -160,7 +156,8 @@ static void *fixed_alloc(arena_t **arenas, size_t size) {
 			arena->freelist = (free_block_t *) 
 				((char *) arena->freelist + size);
 			if((char *) arena + ARENA_SIZE
-				- (char *) arena->freelist < size) {
+				- (char *) arena->freelist
+				< (ptrdiff_t) size) {
 				arena->freelist = ((free_block_t *) p)->next;
 				arena->flags &= ~ARENA_NEW;
 			}
@@ -205,7 +202,7 @@ static void *fixed_alloc(arena_t **arenas, size_t size) {
 	*arenas = arena;
 
 	// Set the flags
-	flagsp = arena->data;
+	flagsp = (uint8_t *) arena->data;
 	*flagsp = *flagsp&~FIXED_GC_MASK(0) | FIXED_GC_BLACK(0);
 
 	heapallocd += arena->size;
@@ -213,7 +210,7 @@ static void *fixed_alloc(arena_t **arenas, size_t size) {
 	return arena->blocks;
 }
 
-static void buddy_add_free_block(arena_t *arena, void *block, int sizeexp) {
+static void buddy_add_free_block(void *block, int sizeexp) {
 	bi_free_block_t *_block = block;
 
 	if(_block->next = buddyfree[sizeexp].next)
@@ -223,7 +220,7 @@ static void buddy_add_free_block(arena_t *arena, void *block, int sizeexp) {
 	buddyfree[sizeexp].next = _block;
 }
 
-static void buddy_claim_free_block(arena_t *arena, void *block, int sizeexp) {
+static void buddy_claim_free_block(void *block) {
 	bi_free_block_t *_block = block;
 
 	if(_block->prev->next = _block->next)
@@ -237,8 +234,8 @@ static void buddy_split_block(arena_t *arena, void *block, int sizeexp) {
 
 	right = (bi_free_block_t *) ((char *) block + (1 << sizeexp - 1));
 
-	// Add right to the free list
-	buddy_add_free_block(arena,right,sizeexp - 1);
+	// right is free
+	buddy_add_free_block(right,sizeexp - 1);
 
 	// Set right's flags
 	*BUDDY_FLAGSP(arena,right) = BUDDY_GC_FREE
@@ -257,7 +254,7 @@ static void *buddy_check_free_lists(int sizeexp) {
 				((uintptr_t) block&~(ARENA_SIZE - 1));
 
 			// Claim it
-			buddy_claim_free_block(arena,block,i);
+			buddy_claim_free_block(block);
 
 			// Split it, as needed
 			while(i > sizeexp)
@@ -280,8 +277,8 @@ static void *buddy_check_free_lists(int sizeexp) {
 static void *buddy_alloc(arena_t **arenas, size_t size) {
 	int sizei;
 	arena_t *arena;
+	bi_free_block_t *block;
 	size_t headsize, nblocks;
-	bi_free_block_t *block, *half;
 
 	// Find a suitable size
 	assert(size < 1 << BUDDY_MAX_EXP);
@@ -321,7 +318,7 @@ static void *buddy_alloc(arena_t **arenas, size_t size) {
 		(int) headsize,100.*headsize/ARENA_SIZE);
 
 	// Split up the new arena for the header
-	for(int i = BUDDY_MAX_EXP - 1; 1 << i >= headsize; i--)
+	for(int i = BUDDY_MAX_EXP - 1; (size_t) 1 << i >= headsize; i--)
 		buddy_split_block(arena,arena,i + 1);
 
 	*arenas = arena;
@@ -394,24 +391,12 @@ case PREFIX_BUILTIN(,fcn): \
 #define MARK_TYPE(t, sq) MARK_TYPE_(t, sq)
 #define MARK_TYPE_(type, squal) mark_##type##_##squal
 
-#define MARK_SHIM(all, var) MARK_SHIM_(all, var)
-#define MARK_SHIM_(t, q, v) MARK_SHIM__(t, q, SQUAL_##q, v)
-#define MARK_SHIM__(t, q, sq, v) MARK_SHIM___(t, q, sq, v)
-#define MARK_SHIM___(type, qual, squal, var) \
-static inline void mark_##var(type QUAL_##qual x) { \
-	MARK_TYPE(type,squal)(x); \
-}
-
-#define MARK_SHIMS(all, def) MARK_SHIMS_ def
-#define MARK_SHIMS_(type, qual, vars) \
-	DEFER(EACH_INDIRECT)()(MARK_SHIM,(),(type, qual),LITERAL vars)
-
 // These are assumed not to be allocated with mem_alloc()
-static void MARK_TYPE(bool,       )(bool x)        {}
-static void MARK_TYPE(bool,      p)(bool *x)       {}
-static void MARK_TYPE(double,     )(double x)      {}
-static void MARK_TYPE(int64_t,    )(int64_t x)     {}
-static void MARK_TYPE(cell_type_t,)(cell_type_t x) {}
+static void MARK_TYPE(bool,       )(bool x)        { (void) x; }
+static void MARK_TYPE(bool,      p)(bool *x)       { (void) x; }
+static void MARK_TYPE(double,     )(double x)      { (void) x; }
+static void MARK_TYPE(int64_t,    )(int64_t x)     { (void) x; }
+static void MARK_TYPE(cell_type_t,)(cell_type_t x) { (void) x; }
 
 // These are assumed to be allocated with mem_alloc()
 
@@ -427,6 +412,16 @@ static void MARK_TYPE(type,pp)(type **x) { \
 }
 
 EACH(DECLARE_MARK_GC_TYPE_INDIRECT,(),(),GC_TYPES)
+
+typedef void (*mark_func_t)(void *);
+
+#define REGISTER_MARK_FUNC(all, type) \
+	[GC_TYPE(type)] = (mark_func_t) MARK_TYPE(type,p), \
+	[GC_TYPE_INDIRECT(type)] = (mark_func_t) MARK_TYPE(type,pp)
+
+static const mark_func_t markfuncs[] = {
+	EACH(REGISTER_MARK_FUNC,(,),(),GC_TYPES)
+};
 
 static void MARK_TYPE(lambda_t,)(lambda_t x) {
 	MARK_TYPE(env_t,p)(x.env);
@@ -452,7 +447,7 @@ static bool mark_ptr(void *p) {
 	case ARENA_FIXED:
 		// Fixed GC bits are all packed together
 		gcbitsi = GC_NUM_BITS*((char *) p - arena->blocks)/arena->size;
-		flagsp = arena->data + gcbitsi/8;
+		flagsp = (uint8_t *) arena->data + gcbitsi/8;
 		marked = FIXED_GC_COLOR(*flagsp,gcbitsi%8)
 			== FIXED_GC_BLACK(gcbitsi%8);
 		*flagsp = *flagsp&~FIXED_GC_MASK(gcbitsi%8)
@@ -540,7 +535,7 @@ static void MARK_TYPE(htable_t,p)(htable_t *x) {
 
 	mark_ptr(x->entries);
 
-	for(int i = 0; i < x->cap; i++)
+	for(uint32_t i = 0; i < x->cap; i++)
 		MARK_TYPE(hentry_t,p)(x->entries[i]);
 }
 
@@ -555,15 +550,19 @@ static void MARK_TYPE(void,p)(void *p) {
 	mark_ptr(p);
 }
 
-EXPAND(EACH(MARK_SHIMS,(),(),EVAL_VARS));
+#define MARK_SHIM(all, var) MARK_SHIM_(all, var)
+#define MARK_SHIM_(t, q, v) MARK_SHIM__(t, q, SQUAL_##q, v)
+#define MARK_SHIM__(t, q, sq, v) MARK_SHIM___(t, q, sq, v)
+#define MARK_SHIM___(type, qual, squal, var) \
+static inline void mark_##var(type QUAL_##qual x) { \
+	MARK_TYPE(type,squal)(x); \
+}
 
-#define REGISTER_MARK_FUNC(all, type) \
-	[GC_TYPE(type)] = (mark_func_t) MARK_TYPE(type,p), \
-	[GC_TYPE_INDIRECT(type)] = (mark_func_t) MARK_TYPE(type,pp)
+#define MARK_SHIMS(all, def) MARK_SHIMS_ def
+#define MARK_SHIMS_(type, qual, vars) \
+	DEFER(EACH_INDIRECT)()(MARK_SHIM,(),(type, qual),LITERAL vars)
 
-static mark_func_t markfuncs[] = {
-	EACH(REGISTER_MARK_FUNC,(,),(),GC_TYPES)
-};
+EXPAND(EACH(MARK_SHIMS,(),(),EVAL_VARS))
 
 static void clean_fixed_arena(arena_t **arena) {
 	char *flagsp;
@@ -634,7 +633,7 @@ static void clean_buddy_arena(arena_t **arena) {
 
 			// Claim it for accounting purposes
 			if(BUDDY_GC_COLOR(*bflagsp) == BUDDY_GC_FREE)
-				buddy_claim_free_block(*arena,buddy,sizeexp);
+				buddy_claim_free_block(buddy);
 
 			sizeexp++;
 
@@ -645,7 +644,7 @@ static void clean_buddy_arena(arena_t **arena) {
 		}
 
 		// 2^sizeexp bytes at p are free
-		buddy_add_free_block(*arena,p,sizeexp);
+		buddy_add_free_block(p,sizeexp);
 
 		*flagsp = BUDDY_GC_FREE | sizeexp - BUDDY_MIN_EXP;
 	}
@@ -678,6 +677,9 @@ void mem_gc(stack_t *stack) {
 	arena_t **arena;
 	enum builtin type;
 	int64_t oldheapsize, oldheapallocd;
+
+	(void) oldheapsize;
+	(void) oldheapallocd;
 
 	// Only do this if we need to
 	if(heapallocd < GC_USE_GROWTH*heapused)
@@ -712,7 +714,7 @@ void mem_gc(stack_t *stack) {
 	}
 
 	// Mark from the handles' root set
-	for(int i = 0; i < nhandles; i++)
+	for(uint32_t i = 0; i < nhandles; i++)
 		markfuncs[handles[i].type](handles[i].p);
 
 	// Clean out each of the arenas

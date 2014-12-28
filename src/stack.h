@@ -2,7 +2,7 @@
 #define STACK_H
 
 #define STACK_ENSURE_SPACE(s, nbytes) ( \
-	(s).top + (nbytes) - (s).bottom > (s).size \
+	(s).top + (nbytes) - (s).bottom > (ptrdiff_t) (s).size \
 		? grow_stack(&(s),(nbytes)) : (void) 0 \
 )
 
@@ -23,7 +23,7 @@
 } while(0)
 
 #define STACK_POP(s, var) do { \
-	assert((s).top - (s).bottom >= sizeof (var)); \
+	assert((s).top - (s).bottom >= (ptrdiff_t) sizeof (var)); \
 	(s).top -= sizeof (var); \
 	memcpy((void *) &(var),(s).top,sizeof (var)); \
 } while(0)

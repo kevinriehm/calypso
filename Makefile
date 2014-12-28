@@ -2,14 +2,15 @@ LYP_CSRC := calypso.c cell.c env.c htable.c mem.c repl.c util.c
 LYP_RSRC := token.c.re
 LYP_YSRC := grammar.y
 
-LYP_CFLAGS := -g --std=c11 -Igen -Isrc -D_POSIX_C_SOURCE=200809L $(CFLAGS)
+LYP_CFLAGS := -g -std=c11 -Igen -Isrc -D_POSIX_C_SOURCE=200809L -Wall \
+	-Wpedantic -Wextra -Wno-parentheses $(CFLAGS)
 LYP_LIBS   := -lm
 
 LYP_DEPS := $(LYP_CSRC:.c=.d) $(LYP_RSRC:.c.re=.d) $(LYP_YSRC:.y=.d)
 LYP_OBJS := $(LYP_CSRC:.c=.o) $(LYP_RSRC:.c.re=.o) $(LYP_YSRC:.y=.o)
 
-CBUILD = $(CC) -c $(LYP_CFLAGS) -o $@ $<
-DBUILD = $(CC) -MM -MG -MF dep/$*.d -MT obj/$*.o $(LYP_CFLAGS) $<
+CBUILD = $(CC) $(LYP_CFLAGS) -c -o $@ $<
+DBUILD = $(CC) $(LYP_CFLAGS) -MM -MG -MT obj/$*.o -MF dep/$*.d $<
 
 .PRECIOUS: %/
 

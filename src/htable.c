@@ -26,7 +26,7 @@ static uint32_t murmur3_32(uint32_t seed, void *key, size_t keylen) {
 	uint32_t k;
 
 	for(i = 0; keylen - i > 3; i += 4) {
-		k = *(uint32_t *) (key + i);
+		k = *(uint32_t *) ((char *) key + i);
 
 		k *= c1;
 		k = (k << r1) | (k >> 32 - r1);
@@ -38,7 +38,7 @@ static uint32_t murmur3_32(uint32_t seed, void *key, size_t keylen) {
 	}
 
 	for(k = 0; i < keylen; i++)
-		k |= *(uint8_t *) (key + i) << 8*(3 - keylen + i);
+		k |= *(uint8_t *) ((char *) key + i) << 8*(3 - keylen + i);
 
 	k *= c1;
 	k = (k << r1) | (k >> 32 - r1);
@@ -72,7 +72,7 @@ static void htable_resize(htable_t *tab, uint32_t cap) {
 	entries = mem_alloc(cap*sizeof *entries);
 	memset(entries,0,cap*sizeof *entries);
 
-	for(int i = 0; i < tab->cap; i++) {
+	for(uint32_t i = 0; i < tab->cap; i++) {
 		for(entry = tab->entries[i]; entry; entry = next) {
 			index = HASH(entry->key,entry->keylen,cap);
 

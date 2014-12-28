@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <inttypes.h>
 #include <setjmp.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -118,7 +119,10 @@ void grow_stack(stack_t *stack, size_t nbytes) {
 	if(newsize > STACK_MAX_SIZE)
 		newsize = STACK_MAX_SIZE;
 	check(newsize >= stack->size + nbytes,"stack overflow");
-fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
+
+	debug("resizing stack: %12li -> %12li",(long) stack->size,
+		(long) newsize);
+
 	newstack = realloc(stack->bottom,
 		newsize*sizeof *stack->bottom);
 	check(newstack,"cannot grow stack");
@@ -175,7 +179,7 @@ fprintf(stderr,"resizing stack: %12i -> %12i\n",stack->size,newsize);
 \
 	SET(__VA_ARGS__); \
 \
-	STACK_ALLOC(stack,jmp_buf); \
+	(void) STACK_ALLOC(stack,jmp_buf); \
 	if(!setjmp(*STACK_TOP(stack,jmp_buf))) \
 		goto fcn; \
 	STACK_FREE(stack,jmp_buf); \
@@ -712,13 +716,11 @@ LABEL
 		EVAL(env,args->car);
 		x = retval;
 
-		check(x && (cell_type(x) == VAL_I64
-			|| cell_type(x) == VAL_DBL),
-			"argument to + not a number");
-
 		switch(cell_type(x)) {
 		case VAL_I64: xdbl = xi64 = x->i64; break;
 		case VAL_DBL: xi64 = xdbl = x->dbl; break;
+
+		default: check(false,"argument to + not a number");
 		}
 
 add_x:
@@ -727,6 +729,8 @@ add_x:
 
 		case VAL_I64: i64 += xi64; break;
 		case VAL_DBL: dbl += xdbl; break;
+
+		default: break;
 		}
 	}
 
@@ -734,6 +738,8 @@ add_x:
 	case VAL_NIL: RETURN(cell_cons_t(VAL_DBL,0.));
 	case VAL_I64: RETURN(cell_cons_t(VAL_I64,i64));
 	case VAL_DBL: RETURN(cell_cons_t(VAL_DBL,dbl));
+
+	default: check(false,"impossible");;
 	}
 
 #undef FUNCTION
@@ -745,13 +751,11 @@ LABEL
 		EVAL(env,args->car);
 		x = retval;
 
-		check(x && (cell_type(x) == VAL_I64
-			|| cell_type(x) == VAL_DBL),
-			"argument to - not a number");
-
 		switch(cell_type(x)) {
 		case VAL_I64: xdbl = xi64 = x->i64; break;
 		case VAL_DBL: xi64 = xdbl = x->dbl; break;
+
+		default: check(false,"argument to - not a number");
 		}
 
 sub_x:
@@ -768,6 +772,8 @@ sub_x:
 
 		case VAL_I64: i64 -= xi64; break;
 		case VAL_DBL: dbl -= xdbl; break;
+
+		default: break;
 		}
 	}
 
@@ -775,6 +781,8 @@ sub_x:
 	case VAL_NIL: RETURN(cell_cons_t(VAL_DBL,0.));
 	case VAL_I64: RETURN(cell_cons_t(VAL_I64,i64));
 	case VAL_DBL: RETURN(cell_cons_t(VAL_DBL,dbl));
+
+	default: check(false,"impossible");
 	}
 
 // Cleanup when actually returning
@@ -792,7 +800,7 @@ void print(cell_t *sexp) {
 
 	switch(cell_type(sexp)) {
 	case VAL_SYM: printf("%s",sexp->sym);                        break;
-	case VAL_I64: printf("%lli",sexp->i64);                      break;
+	case VAL_I64: printf("%" PRId64,sexp->i64);                  break;
 	case VAL_DBL: printf("%f",sexp->dbl);                        break;
 	case VAL_CHR: printf("'%c'",sexp->chr);                      break;
 	case VAL_STR: printf("\"%.*s\"",(int) sexp->i64,sexp->data); break;
@@ -825,7 +833,6 @@ void run_file(env_t *env, FILE *in) {
 	void *p;
 	stream_t *s;
 	cell_t *sexp;
-	bool interactive;
 
 	// Set up the parser
 	p = ParseAlloc(malloc);

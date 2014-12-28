@@ -17,7 +17,7 @@
 #include "va_macro.h"
 
 #define GC_NUM_BITS   2
-#define GC_USE_GROWTH 100
+#define GC_USE_GROWTH 5
 
 #define GC_COLOR(bit0, bit1, flags) ((flags) & ((bit0) | (bit1)))
 #define GC_FREE                     0

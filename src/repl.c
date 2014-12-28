@@ -284,6 +284,8 @@ cell_t *eval(env_t *_env, cell_t *_sexp) {
 #undef FUNCTION
 #define FUNCTION eval
 LABEL
+	op = NULL;
+
 	if(!sexp)
 		RETURN(sexp);
 
@@ -348,6 +350,9 @@ LABEL
 #undef FUNCTION
 #define FUNCTION bind_args
 LABEL
+	head = NULL;
+	tail = NULL;
+
 	for(; args && template; args = args->cdr, template = template->cdr) {
 		// Skip nils in the template
 		while(!template->car)
@@ -464,6 +469,8 @@ LABEL
 #undef FUNCTION
 #define FUNCTION cons
 LABEL
+	sexp = NULL;
+
 	check(args && args->cdr,"too few arguments to cons");
 	check(!args->cdr->cdr,"too many arguments to cons");
 
@@ -476,6 +483,8 @@ LABEL
 #undef FUNCTION
 #define FUNCTION eq
 LABEL
+	a = NULL;
+
 	check(args && args->cdr,"too few arguments to eq");
 	check(!args->cdr->cdr,"too many arguments to eq");
 

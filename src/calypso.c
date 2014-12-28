@@ -8,28 +8,7 @@
 #include "repl.h"
 #include "util.h"
 
-typedef struct string {
-	char *s;
-	unsigned cap, len;
-} string_t;
-
 void grammar_init();
-
-void str_init(string_t *str) {
-	str->s = NULL;
-	str->cap = 0;
-	str->len = 0;
-}
-
-void str_cat_c(string_t *str, char c) {
-	if(++str->len > str->cap) {
-		str->cap = 1.5*(str->cap + 1);
-		str->s = realloc(str->s,str->cap + 1);
-	}
-
-	str->s[str->len - 1] = c;
-	str->s[str->len] = '\0';
-}
 
 int main(int argc, char **argv) {
 	int i;

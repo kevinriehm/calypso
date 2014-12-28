@@ -758,5 +758,7 @@ void *mem_set_handle(uint32_t handle, void *p) {
 	assert(handle < nhandles);
 
 	handles[handle].p = p;
+
+	return p;
 }
 

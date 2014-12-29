@@ -316,26 +316,31 @@ LABEL
 		if(cell_type(op) == VAL_FCN) {
 			sexp = sexp->cdr;
 			switch(op->fcn) {
-			case FCN_APPEND:      JMP_APPEND(env,sexp);      break;
-			case FCN_ATOM:        JMP_ATOM(env,sexp);        break;
-			case FCN_CAR:         JMP_CAR(env,sexp);         break;
-			case FCN_CDR:         JMP_CDR(env,sexp);         break;
-			case FCN_COND:        JMP_COND(env,sexp);        break;
-			case FCN_CONS:        JMP_CONS(env,sexp);        break;
-			case FCN_EQ:          JMP_EQ(env,sexp);          break;
-			case FCN_EVAL:        JMP_EVAL(env,sexp);        break;
-			case FCN_GENSYM:      JMP_GENSYM(env,sexp);      break;
-			case FCN_LAMBDA:      JMP_LAMBDA(env,sexp);      break;
-			case FCN_MACRO:       JMP_MACRO(env,sexp);       break;
-			case FCN_MACROEXPAND: JMP_MACROEXPAND(env,sexp); break;
-			case FCN_MACROEXPAND_1:
-				JMP_MACROEXPAND_1(env,sexp); break;
-			case FCN_PRINT:       JMP_PRINT(env,sexp);       break;
-			case FCN_QUASIQUOTE:  JMP_QUASIQUOTE(env,sexp);  break;
-			case FCN_QUOTE:       JMP_QUOTE(env,sexp);       break;
-			case FCN_ASSIGN:      JMP_ASSIGN(env,sexp);      break;
-			case FCN_ADD:         JMP_ADD(env,sexp);         break;
-			case FCN_SUB:         JMP_SUB(env,sexp);         break;
+			case FCN_APPEND:        JMP_APPEND(env,sexp);
+			case FCN_ATOM:          JMP_ATOM(env,sexp);
+			case FCN_CAR:           JMP_CAR(env,sexp);
+			case FCN_CDR:           JMP_CDR(env,sexp);
+			case FCN_COND:          JMP_COND(env,sexp);
+			case FCN_CONS:          JMP_CONS(env,sexp);
+			case FCN_EQ:            JMP_EQ(env,sexp);
+			case FCN_GENSYM:        JMP_GENSYM(env,sexp);
+			case FCN_LAMBDA:        JMP_LAMBDA(env,sexp);
+			case FCN_MACRO:         JMP_MACRO(env,sexp);
+			case FCN_MACROEXPAND:   JMP_MACROEXPAND(env,sexp);
+			case FCN_MACROEXPAND_1: JMP_MACROEXPAND_1(env,sexp);
+			case FCN_PRINT:         JMP_PRINT(env,sexp);
+			case FCN_QUASIQUOTE:    JMP_QUASIQUOTE(env,sexp);
+			case FCN_QUOTE:         JMP_QUOTE(env,sexp);
+			case FCN_ASSIGN:        JMP_ASSIGN(env,sexp);
+			case FCN_ADD:           JMP_ADD(env,sexp);
+			case FCN_SUB:           JMP_SUB(env,sexp);
+
+			case FCN_EVAL:
+				check(sexp,"too few arguments to eval");
+				check(!sexp->cdr,"too many arguments to eval");
+
+				EVAL(env,sexp->car);
+				JMP_EVAL(env,retval);
 			}
 
 			check(false,"unhandled function type");

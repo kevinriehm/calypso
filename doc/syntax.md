@@ -36,10 +36,11 @@ S-expressions
    - If the third component is omitted, it is equivalent to if the component
      had been included and its expression was the atom `nil`.
 
-   - An S-expression is nominally a linked list. However, the `.` syntax allows
-     for specifying a value for what would normally be the NULL (nil) pointer
-     signifying the end of the list (the cdr of the last cons cell); this means
-     an S-expression can represent not just lists but trees.
+   - An S-expression is nominally a linked list (and will be referred to as
+     such). However, the `.` syntax allows for specifying a value for what
+     would normally be the NULL (nil) pointer signifying the end of the list
+     (the cdr of the last cons cell); this means an S-expression can represent
+     not just lists but trees.
 
 Atoms
 -----
@@ -54,6 +55,10 @@ Atoms
 
    - As special cases, `=`, `+`, and `-` are symbols when it is not possible
      for them to be a component of another atom.
+
+   - Symbols store values (i.e., they are variables). These values can be any
+     expression, as well as built-in functions and macro or lambda
+     constructions.
 
    - The same symbol input syntax will always correspond to the same symbol
      internally, but note that it is possible for two distinct internal symbols
@@ -97,6 +102,15 @@ Atoms
      newline, carriage return, horizontal tab, or vertical tab, respectively.
      Otherwise, the escape sequence evaluates to the single byte itself.
 
+Empty List
+----------
+
+ - The S-expression `()`, representing the empty list, is equivalent to the
+   atom `nil`.
+
+   - Note how this implies that "is an atom" is not equivalent to "is not an
+     S-expression", and vice-versa.
+
 Quoting Syntax
 --------------
 
@@ -111,4 +125,23 @@ Quoting Syntax
 
  - The sequence `,@x`, where `x` represents an expression, is equivalent to
    the expression `(unquote-splicing x)`.
+
+Evaluation
+----------
+
+ - Evaluation of a program consists of the sequential evaluation of each
+   expression in the program.
+
+ - An S-expression is evaluated by evaluating its first expression (i.e., the
+   first element of the list); this must result in a built-in function or a
+   lambda, which is itself then evaluated with the remaining elements of the
+   S-expression as its arguments.
+
+ - A symbol evaluates to the value last assigned to it by the `=` builtin (or,
+   in the case of built-in functions, the value assigned to it internally by
+   Calypso).
+
+ - A non-symbol atom evaluates to itself.
+
+   - This includes `()`/`nil`.
 

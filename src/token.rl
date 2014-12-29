@@ -29,7 +29,7 @@ struct stream {
 	int act, cs;
 	char *eof, *p, *pe, *te, *ts;
 
-	unsigned lineno;
+	uint32_t lineno;
 
 	bool tokinited;
 
@@ -50,6 +50,7 @@ stream_t *stream_cons_f(FILE *f) {
 	assert(s->buf);
 	s->eof = NULL;
 	s->p = s->pe = s->buf;
+	s->lineno = 1;
 	s->tokinited = false;
 
 	return s;
@@ -62,6 +63,10 @@ void stream_free(stream_t *s) {
 
 bool stream_interactive(stream_t *s) {
 	return s->interactive;
+}
+
+uint32_t stream_lineno(stream_t *s) {
+	return s->lineno;
 }
 
 static void fill(stream_t *s) {
@@ -199,7 +204,7 @@ refill:
 
 		scanner := |*
 			[ \t];
-			'\n' => { lineno++; };
+			'\n' => { s->lineno++; };
 
 			'(' => { ret = TOK_LPAREN; fbreak; };
 			')' => { ret = TOK_RPAREN; fbreak; };

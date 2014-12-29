@@ -63,9 +63,9 @@ struct cell;
 struct env;
 struct lambda;
 
-extern int lineno;
 extern char *filename;
 extern jmp_buf checkjmp;
+extern struct stream *currentstream;
 
 void builtin_init(struct env *);
 

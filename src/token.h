@@ -2,6 +2,7 @@
 #define TOKEN_H
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 
 typedef struct stream stream_t;
@@ -22,6 +23,7 @@ stream_t *stream_cons_f(FILE *);
 void stream_free(stream_t *);
 
 bool stream_interactive(stream_t *);
+uint32_t stream_lineno(stream_t *);
 
 int token_next(stream_t *, token_value_t *);
 

@@ -21,9 +21,9 @@
 #define STACK_MAX_SIZE 10000000
 #define STACK_GROWTH   1.4
 
-int lineno;
 char *filename;
 jmp_buf checkjmp;
+stream_t *currentstream;
 
 static char *str_t;
 static char *str_unquote;
@@ -831,33 +831,33 @@ void print(cell_t *sexp) {
 
 void run_file(env_t *env, FILE *in) {
 	void *p;
-	stream_t *s;
 	cell_t *sexp;
 
 	// Set up the parser
 	p = ParseAlloc(malloc);
-	s = stream_cons_f(in);
+	currentstream = stream_cons_f(in);
 
 	// Catch check failures (i.e., run-time errors)
 	setjmp(checkjmp);
 
 	while(true) {
-		if(!readf(p,s,&sexp))
+		if(!readf(p,currentstream,&sexp))
 			break;
 
 		sexp = eval(env,sexp);
 
-		if(stream_interactive(s)) {
+		if(stream_interactive(currentstream)) {
 			print(sexp);
 			putchar('\n');
 		}
 	}
 
-	if(stream_interactive(s))
+	if(stream_interactive(currentstream))
 		putchar('\n');
 
 	// Clean up
-	stream_free(s);
+	stream_free(currentstream);
+	currentstream = NULL;
 	ParseFree(p,free);
 }
 

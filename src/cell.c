@@ -79,7 +79,7 @@ cell_t *cell_dup(cell_t *cell) {
 cell_type_t cell_type(cell_t *cell) {
 	uintptr_t type;
 
-	type = (uintptr_t) cell->car;
+	type = cell ? (uintptr_t) cell->car : VAL_LST;
 
 	return type != VAL_NIL && type < NUM_VAL_TYPES ? type : VAL_LST;
 }

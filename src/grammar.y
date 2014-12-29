@@ -66,6 +66,7 @@ atom(A) ::= REAL(R).      { A = cell_cons_t(VAL_DBL,R.dbl); }
 atom(A) ::= CHARACTER(C). { A = cell_cons_t(VAL_CHR,C.chr); }
 atom(A) ::= STRING(S).    { A = cell_cons_t(VAL_STR,S.str,S.len); }
 atom(A) ::= SYMBOL(S).    {
-		A = cell_cons_t(VAL_SYM,cell_str_intern(S.str,S.len));
+		A = strncmp("nil",S.str,S.len) == 0 ? NULL
+			: cell_cons_t(VAL_SYM,cell_str_intern(S.str,S.len));
 	}
 

@@ -133,9 +133,13 @@ Evaluation
    expression in the program.
 
  - An S-expression is evaluated by evaluating its first expression (i.e., the
-   first element of the list); this must result in a built-in function or a
-   lambda, which is itself then evaluated with the remaining elements of the
-   S-expression as its arguments.
+   first element of the list), which must result in a built-in function or a
+   lambda. The remaining elements of the S-expression are then evaluated,
+   sequentially, and passed as the arguments to the built-in or lambda.
+
+   - If the built-in or lambda is a special form (as specified in their
+     respective documentation), then the remaining elements of the S-expression
+     are passed as literal expressions, without being evaluated.
 
  - A symbol evaluates to the value last assigned to it by the `=` builtin (or,
    in the case of built-in functions, the value assigned to it internally by

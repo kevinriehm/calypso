@@ -139,7 +139,7 @@ refill:
 			case 'b': fc = '\b'; break;
 			case 'f': fc = '\f'; break;
 			case 'n': fc = '\n'; break;
-			case 'r': fc = '\f'; break;
+			case 'r': fc = '\r'; break;
 			case 't': fc = '\t'; break;
 			case 'v': fc = '\v'; break;
 			}

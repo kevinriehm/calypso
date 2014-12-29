@@ -512,17 +512,9 @@ LABEL
 	case VAL_DBL: RETURN(a->dbl == b->dbl ? sym_t : NULL);
 	case VAL_CHR: RETURN(a->chr == b->chr ? sym_t : NULL);
 	case VAL_FCN: RETURN(a->fcn == b->fcn ? sym_t : NULL);
-
-	case VAL_STR:
-		RETURN(a->i64 == b->i64 && memcmp(a->data,b->data,a->i64) == 0
-			? sym_t : NULL);
-
-	case VAL_LBA:
-		RETURN(memcmp(cell_lba(a),cell_lba(b),sizeof(lambda_t)) == 0
-			? sym_t : NULL);
-
-	case VAL_LST:
-		RETURN(NULL);
+	case VAL_STR: RETURN(NULL);
+	case VAL_LBA: RETURN(NULL);
+	case VAL_LST: RETURN(NULL);
 
 	default:
 		error("unhandled value in eq, type %i",cell_type(a));

@@ -6,7 +6,7 @@ Builtin: append
 Description
 -----------
 
-**append** takes zero or more lists as arguments, and returns their
+**append** takes zero or more lists as arguments and returns their
 concatenation.
 
 The concatenation consists of shallow copies of all but the last argument; the

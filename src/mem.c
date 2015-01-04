@@ -393,7 +393,6 @@ case PREFIX_BUILTIN(,fcn): \
 
 // These are assumed not to be allocated with mem_alloc()
 static void MARK_TYPE(bool,       )(bool x)        { (void) x; }
-static void MARK_TYPE(bool,      p)(bool *x)       { (void) x; }
 static void MARK_TYPE(double,     )(double x)      { (void) x; }
 static void MARK_TYPE(int64_t,    )(int64_t x)     { (void) x; }
 static void MARK_TYPE(cell_type_t,)(cell_type_t x) { (void) x; }

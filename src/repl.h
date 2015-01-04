@@ -28,15 +28,14 @@
 #define PRESERVE_print         env, args
 #define PRESERVE_quasiquote
 #define PRESERVE_quasiquote_unquote \
-                               env, sexp, head, tail, splicep
+                               env, sexp, toplevel, head, tail
 #define PRESERVE_quote
 #define PRESERVE_assign        env, sym
 #define PRESERVE_add           env, args, dbl, i64, type
 #define PRESERVE_sub           env, args, dbl, i64, type
 
 #define EVAL_VARS \
-	(bool,       v, (ismacro, splice)), \
-	(bool,     vpv, (splicep)), \
+	(bool,       v, (ismacro, splice, toplevel)), \
 	(cell_t,    pv, (sexp, retval, op, template, args, head, body, pair, \
 		a, b, sym, x)), \
 	(cell_t,  pvpv, (tail)), \

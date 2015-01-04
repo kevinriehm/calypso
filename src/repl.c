@@ -243,8 +243,8 @@ void grow_stack(stack_t *stack, size_t nbytes) {
 	JMP(print,env,(_env),args,(_args))
 #define JMP_QUASIQUOTE(_env, _args) \
 	JMP(quasiquote,env,(_env),args,(_args))
-#define QUASIQUOTE_UNQUOTE(_env, _sexp, _splicep) \
-	CALL(quasiquote_unquote,env,(_env),sexp,(_sexp),splicep,(_splicep))
+#define QUASIQUOTE_UNQUOTE(_env, _sexp, _toplevel) \
+	CALL(quasiquote_unquote,env,(_env),sexp,(_sexp),toplevel,(_toplevel))
 #define JMP_QUOTE(_env, _args) \
 	JMP(quote,env,(_env),args,(_args))
 #define JMP_ASSIGN(_env, _args) \
@@ -622,14 +622,13 @@ LABEL
 	check(!args->cdr,"too many arguments to quasiquote");
 
 	sexp = args->car;
-	splicep = NULL;
+	toplevel = true;
 
 #undef FUNCTION
 #define FUNCTION quasiquote_unquote
 LABEL
 	// Default
-	if(splicep)
-		*splicep = false;
+	splice = false;
 
 	// atom
 	if(cell_is_atom(sexp))
@@ -651,18 +650,22 @@ LABEL
 		&& sexp->car->sym == str_unquote_splicing) {
 		sexp = sexp->cdr;
 
-		check(splicep,"syntax `,@sexp is undefined");
+		check(!toplevel,"syntax `,@sexp is undefined");
 		check(sexp,"too few arguments to unquote-splicing");
 		check(!sexp->cdr,"too many arguments to unquote-splicing");
 
-		*splicep = true;
+		EVAL(env,sexp->car);
 
-		JMP_EVAL(env,sexp->car);
+		check(cell_is_list(retval),"syntax ,@atom is undefined");
+
+		splice = true;
+
+		RETURN(retval);
 	}
 
 	// (... ,sexp ... ,@sexp ...)
 	for(head = sexp, tail = &head; sexp; sexp = sexp->cdr) {
-		QUASIQUOTE_UNQUOTE(env,sexp->car,&splice);
+		QUASIQUOTE_UNQUOTE(env,sexp->car,false);
 
 		if(splice)
 			*tail = retval;
@@ -672,8 +675,7 @@ LABEL
 	}
 
 	// Default again
-	if(splicep)
-		*splicep = false;
+	splice = false;
 
 	RETURN(head);
 

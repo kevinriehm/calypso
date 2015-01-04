@@ -11,11 +11,7 @@ typedef union token_value {
 	char chr;
 	double dbl;
 	int64_t i64;
-
-	struct {
-		char *str;
-		int64_t len;
-	};
+	struct string *str;
 } token_value_t;
 
 

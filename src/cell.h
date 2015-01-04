@@ -5,10 +5,8 @@
 #include <stdint.h>
 #include <string.h>
 
-#define INTERN_CONST_STRING(str) \
-	(cell_str_intern(mem_dup((str),strlen((str)) + 1),strlen((str))))
-
-struct env;
+#define INTERN_CONST_STRING(cstr) \
+	(cell_str_intern(cell_str_cons((cstr),strlen((cstr)))))
 
 typedef enum cell_type {
 	VAL_NIL, // Also a list
@@ -56,17 +54,24 @@ typedef struct lambda {
 	struct cell *body;
 } lambda_t;
 
+typedef struct string {
+	size_t len;
+	char str[];
+} string_t;
+
 typedef struct cell {
 	struct cell *car;
 
 	union {
 		struct cell *cdr;
 
-		char chr;
+		string_t *sym;
+
 		double dbl;
 		int64_t i64;
 
-		char *sym;
+		char chr;
+		string_t *str;
 
 		fcn_t fcn;
 	};
@@ -84,7 +89,8 @@ lambda_t *cell_lba(cell_t *);
 bool cell_is_atom(cell_t *);
 bool cell_is_list(cell_t *);
 
-char *cell_str_intern(char *, unsigned);
+string_t *cell_str_cons(char *, size_t);
+string_t *cell_str_intern(string_t *);
 
 #endif
 

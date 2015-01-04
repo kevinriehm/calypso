@@ -38,7 +38,7 @@ void htable_insert(htable_t *, void *, size_t, hvalue_t);
 bool htable_lookup(htable_t *, void *, size_t, hvalue_t *);
 void htable_remove(htable_t *, void *, size_t);
 
-char *htable_intern(htable_t *, void *, size_t);
+void *htable_intern(htable_t *, void *, size_t);
 
 #endif
 

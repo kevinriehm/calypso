@@ -21,32 +21,24 @@ cell_t *cell_cons(cell_t *car, cell_t *cdr) {
 }
 
 cell_t *cell_cons_t(cell_type_t type, ...) {
-	char *str;
 	va_list ap;
-	int64_t len;
 	cell_t *cell;
 
 	va_start(ap,type);
 
-	if(type == VAL_STR) {
-		str = va_arg(ap,char *);
-		len = va_arg(ap,int64_t);
-
-		cell = mem_alloc((sizeof *cell) + len);
-		cell->i64 = len;
-		memcpy(cell->data,str,len);
-	} else if(type == VAL_LBA) {
+	if(type == VAL_LBA) {
 		cell = mem_alloc((sizeof *cell) + sizeof(lambda_t));
 		memcpy(cell->data,va_arg(ap,lambda_t *),sizeof(lambda_t));
 	} else {
 		cell = mem_alloc(sizeof *cell);
 		switch(type) {
 		case VAL_NIL: cell->cdr = NULL; break;
-		case VAL_SYM: cell->sym = va_arg(ap,char *);  break;
-		case VAL_I64: cell->i64 = va_arg(ap,int64_t); break;
-		case VAL_DBL: cell->dbl = va_arg(ap,double);  break;
-		case VAL_CHR: cell->chr = va_arg(ap,int);     break;
-		case VAL_FCN: cell->fcn = va_arg(ap,fcn_t);   break;
+		case VAL_SYM: cell->sym = va_arg(ap,string_t *); break;
+		case VAL_I64: cell->i64 = va_arg(ap,int64_t);    break;
+		case VAL_DBL: cell->dbl = va_arg(ap,double);     break;
+		case VAL_CHR: cell->chr = va_arg(ap,int);        break;
+		case VAL_STR: cell->str = va_arg(ap,string_t *); break;
+		case VAL_FCN: cell->fcn = va_arg(ap,fcn_t);      break;
 
 		default: die("unhandled cell type (%i)",type);
 		}
@@ -91,7 +83,8 @@ lambda_t *cell_lba(cell_t *cell) {
 }
 
 bool cell_is_atom(cell_t *cell) {
-	return !cell || cell_type(cell) != VAL_LST;
+	return !cell || cell_type(cell) != VAL_NIL
+		&& cell_type(cell) != VAL_LST;
 }
 
 bool cell_is_list(cell_t *cell) {
@@ -99,7 +92,16 @@ bool cell_is_list(cell_t *cell) {
 		|| cell_type(cell) == VAL_LST;
 }
 
-char *cell_str_intern(char *str, unsigned len) {
+string_t *cell_str_cons(char *cstr, size_t len) {
+	string_t *str;
+
+	str = mem_alloc(sizeof *str + len);
+	memcpy(str->str,cstr,str->len = len);
+
+	return str;
+}
+
+string_t *cell_str_intern(string_t *str) {
 	static uint32_t internedh;
 	static htable_t *interned = NULL;
 
@@ -108,6 +110,6 @@ char *cell_str_intern(char *str, unsigned len) {
 		interned = mem_set_handle(internedh,htable_cons(0));
 	}
 
-	return htable_intern(interned,str,len);
+	return htable_intern(interned,str,sizeof *str + str->len);
 }
 

@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+struct string;
+
 typedef struct env {
 	struct env *parent;
 
@@ -13,8 +15,8 @@ env_t *env_cons(env_t *);
 
 env_t *env_parent(env_t *);
 
-bool env_get(env_t *, char *, struct cell **);
-void env_set(env_t *, char *, struct cell *, bool);
+bool env_get(env_t *, struct string *, struct cell **);
+void env_set(env_t *, struct string *, struct cell *, bool);
 
 #endif
 

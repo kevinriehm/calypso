@@ -8,11 +8,15 @@
 #include "token.h"
 #include "util.h"
 
-static char *str_quote, *str_quasiquote, *str_unquote, *str_unquote_splicing;
+static string_t *str_quote;
+static string_t *str_quasiquote;
+static string_t *str_unquote;
+static string_t *str_unquote_splicing;
 
-static cell_t *wrap(char *first, cell_t *cell) {
+// first is assumed to be already interned
+static cell_t *wrap(string_t *first, cell_t *cell) {
 	return cell_cons(
-		cell_cons_t(VAL_SYM,cell_str_intern(first,strlen(first))),
+		cell_cons_t(VAL_SYM,first),
 		cell_cons(cell,NULL)
 	);
 }
@@ -64,9 +68,9 @@ s_exp_list(R) ::= s_exp(S) s_exp_list(L). { R = cell_cons(S,L); }
 atom(A) ::= INTEGER(I).   { A = cell_cons_t(VAL_I64,I.i64); }
 atom(A) ::= REAL(R).      { A = cell_cons_t(VAL_DBL,R.dbl); }
 atom(A) ::= CHARACTER(C). { A = cell_cons_t(VAL_CHR,C.chr); }
-atom(A) ::= STRING(S).    { A = cell_cons_t(VAL_STR,S.str,S.len); }
+atom(A) ::= STRING(S).    { A = cell_cons_t(VAL_STR,S.str); }
 atom(A) ::= SYMBOL(S).    {
-		A = strncmp("nil",S.str,S.len) == 0 ? NULL
-			: cell_cons_t(VAL_SYM,cell_str_intern(S.str,S.len));
+		A = strncmp("nil",S.str->str,S.str->len) == 0 ? NULL
+			: cell_cons_t(VAL_SYM,cell_str_intern(S.str));
 	}
 

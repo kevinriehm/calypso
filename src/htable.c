@@ -172,7 +172,7 @@ void htable_remove(htable_t *tab, void *key, size_t keylen) {
 	// key isn't in tab
 }
 
-char *htable_intern(htable_t *tab, void *key, size_t keylen) {
+void *htable_intern(htable_t *tab, void *key, size_t keylen) {
 	uint32_t index;
 	hentry_t *entry;
 

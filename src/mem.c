@@ -483,7 +483,7 @@ static bool mark_ptr(void *p) {
 	return marked;
 }
 
-static void MARK_TYPE(char,p)(char *x) {
+static void MARK_TYPE(string_t,p)(string_t *x) {
 	mark_ptr(x);
 }
 
@@ -493,7 +493,11 @@ static void MARK_TYPE(cell_t,p)(cell_t *x) {
 
 	switch(cell_type(x)) {
 	case VAL_SYM:
-		MARK_TYPE(char,p)(x->sym);
+		MARK_TYPE(string_t,p)(x->sym);
+		break;
+
+	case VAL_STR:
+		MARK_TYPE(string_t,p)(x->str);
 		break;
 
 	case VAL_LBA:

@@ -25,9 +25,9 @@ char *filename;
 jmp_buf checkjmp;
 stream_t *currentstream;
 
-static char *str_t;
-static char *str_unquote;
-static char *str_unquote_splicing;
+static string_t *str_t;
+static string_t *str_unquote;
+static string_t *str_unquote_splicing;
 
 static cell_t *sym_t;
 
@@ -76,7 +76,7 @@ void builtin_init(env_t *env) {
 
 	// Built-in functions
 	for(fcn = fcns; fcn->name; fcn++)
-		env_set(env,cell_str_intern(fcn->name,strlen(fcn->name)),
+		env_set(env,INTERN_CONST_STRING(fcn->name),
 			cell_cons_t(VAL_FCN,fcn->fcn),true);
 }
 
@@ -796,7 +796,8 @@ void print(cell_t *sexp) {
 	}
 
 	switch(cell_type(sexp)) {
-	case VAL_SYM: printf("%s",sexp->sym);                        break;
+	case VAL_SYM: printf("%.*s",(int) sexp->sym->len,sexp->sym->str);
+		break;
 	case VAL_I64: printf("%" PRId64,sexp->i64);                  break;
 	case VAL_DBL: printf("%f",sexp->dbl);                        break;
 	case VAL_CHR: printf("'%c'",sexp->chr);                      break;

@@ -23,7 +23,7 @@ env_t *env_parent(env_t *env) {
 	return env ? env->parent : NULL;
 }
 
-bool env_get(env_t *env, char *sym, cell_t **val) {
+bool env_get(env_t *env, string_t *sym, cell_t **val) {
 	bool exists;
 	hvalue_t hval;
 
@@ -38,7 +38,7 @@ bool env_get(env_t *env, char *sym, cell_t **val) {
 	return exists;
 }
 
-void env_set(env_t *env, char *sym, cell_t *val, bool local) {
+void env_set(env_t *env, string_t *sym, cell_t *val, bool local) {
 	bool exists;
 	env_t *localenv;
 

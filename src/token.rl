@@ -6,6 +6,7 @@
 
 #include <unistd.h>
 
+#include "cell.h"
 #include "grammar.h"
 #include "mem.h"
 #include "repl.h"
@@ -236,16 +237,15 @@ refill:
 			};
 
 			'"' ([^"\\] | EC)* '"' => {
-				val->str = mem_dup(s->ts + 1,
-					val->len = s->te - s->ts - 2);
+				val->str = cell_str_cons(s->ts + 1,
+					s->te - s->ts - 2);
 				ret = TOK_STRING;
 				fbreak;
 			};
 
 			[a-zA-Z$_][a-zA-Z0-9$_\-]* |
 			[=+\-]                  => {
-				val->str = mem_dup(s->ts,
-					val->len = s->te - s->ts);
+				val->str = cell_str_cons(s->ts,s->te - s->ts);
 				ret = TOK_SYMBOL;
 				fbreak;
 			};

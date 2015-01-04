@@ -58,9 +58,7 @@ enum builtin {
 	EACH(PREFIX_BUILTIN,(,),(),BUILTINS)
 };
 
-struct cell;
 struct env;
-struct lambda;
 
 extern char *filename;
 extern jmp_buf checkjmp;
@@ -69,8 +67,6 @@ extern struct stream *currentstream;
 void builtin_init(struct env *);
 
 void run_file(struct env *, FILE *);
-
-struct cell *eval(struct env *, struct cell *);
 
 #endif
 

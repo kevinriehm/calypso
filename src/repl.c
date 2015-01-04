@@ -800,13 +800,14 @@ void print(cell_t *sexp) {
 	switch(cell_type(sexp)) {
 	case VAL_SYM: printf("%.*s",(int) sexp->sym->len,sexp->sym->str);
 		break;
-	case VAL_I64: printf("%" PRId64,sexp->i64);                  break;
-	case VAL_DBL: printf("%f",sexp->dbl);                        break;
-	case VAL_CHR: printf("'%c'",sexp->chr);                      break;
-	case VAL_STR: printf("\"%.*s\"",(int) sexp->i64,sexp->data); break;
-	case VAL_FCN: printf("<fcn>");                               break;
+	case VAL_I64: printf("%" PRId64,sexp->i64); break;
+	case VAL_DBL: printf("%f",sexp->dbl);       break;
+	case VAL_CHR: printf("'%c'",sexp->chr);     break;
+	case VAL_STR: printf("\"%.*s\"",(int) sexp->str->len,sexp->str->str);
+		break;
+	case VAL_FCN: printf("<fcn>");              break;
 	case VAL_LBA: printf("<%s>",cell_lba(sexp)->ismacro
-		? "macro" : "lambda");                               break;
+		? "macro" : "lambda"); break;
 
 	case VAL_NIL:
 	default:
